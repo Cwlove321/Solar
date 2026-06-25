@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solarutils"
+version = "0.1.0"
+description = "Reusable solar physics data processing and plotting utilities."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Xiaoxingyun" }
+]
+dependencies = [
+  "numpy",
+  "scipy",
+  "matplotlib",
+  "astropy",
+  "sunpy",
+  "drms",
+]
+
+[project.optional-dependencies]
+aia = ["aiapy"]
+io = ["pyevtk"]
+solar-orbiter = ["sunpy-soar"]
+cdf = ["cdflib"]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

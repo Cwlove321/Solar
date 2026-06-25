@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.mpl_config/
+.mplconfig/
+.matplotlib/
+.sunpy_config/
+.cache/
+build/
+dist/
+
+# Jupyter / macOS
+.ipynb_checkpoints/
+.DS_Store
+
+# Environments
+.venv/
+venv/
+env/
+
+# Large scientific data and generated products
+cases/
+data/
+tmp/
+*.fits
+*.fts
+*.sav
+*.cdf
+*.npy
+*.npz
+*.dat
+*.vtr
+*.vts
+*.vtu
+*.pvsm
+*.mp4
+*.coef
+*.log
+*.mod
+
+# AMRVAC local build products
+src/solarutils/amrvac/**/amrvac
+src/solarutils/amrvac/**/output.*
+
+# Generated figures are tracked only when intentionally added under cases/*/figures/final
+*.png
+*.pdf
+*.eps
+
+!cases/**/figures/final/*.png
+!cases/**/figures/final/*.pdf
+!cases/**/README.md
+!cases/**/data_manifest.md
+!cases/**/config.yaml

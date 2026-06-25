@@ -1,0 +1,104 @@
+!$AMRVAC_DIR/setup.pl -d=3
+
+ &filelist
+        base_filename='./data/nlfff_'
+        saveprim=.true.
+        nwauxio=4
+        restart_from_file='../pfss/data/lfff0000.dat'
+        firstprocess=F
+        autoconvert=T
+    	convert_type='vtuBmpi'
+ /
+        restart_from_file='./02pfss/data/run01_a0_6Mm/lfff0000.dat'
+        snapshotnext=4
+        autoconvert=.true.
+        convert_type='vtuBmpi'
+
+ &savelist
+       itsave(1,1)=0
+        itsave(1,2)=0
+        ditsave_log=1
+ /
+        itsave(1,1)=0
+        ditsave_log=1
+        itsave(1,2)=0
+        dtsave_dat=2.d0
+        ditsave_dat=100
+
+ &stoplist
+        dtmin=1.D-10
+        it_max=0
+        reset_time=F
+ /
+
+        time_max=60.d0
+
+ &methodlist
+        time_stepper='onestep'
+        flux_scheme=20*'cd4'
+        limiter=20*'koren'
+        small_pressure=1.0d-14
+        small_density=1.0d-14
+ /
+
+ &boundlist
+        typeboundary_min1 = 7*'special'
+        typeboundary_max1 = 7*'special'
+        typeboundary_min2 = 7*'special'
+        typeboundary_max2 = 7*'special'
+        typeboundary_min3 = 7*'special'
+        typeboundary_max3 = 7*'special'
+ /
+
+ &meshlist
+        refine_criterion=3
+        refine_max_level=1
+        refine_threshold=20*0.2d0
+        derefine_ratio=20*0.1d0
+        w_refine_weight(1)=0.4d0
+        w_refine_weight(5)=0.2d0
+        w_refine_weight(6)=0.2d0
+        w_refine_weight(7)=0.2d0
+        block_nx1=20
+        block_nx2=20
+        block_nx3=20
+        domain_nx1= 240
+        domain_nx2= 240
+        domain_nx3= 480
+        xprobmin1= 1.001d0
+        xprobmax1= 1.601d0
+        xprobmin2 = 0.16111111111111112
+        xprobmax2 = 0.22777777777777777
+        xprobmin3 = 0.5361111111111111
+        xprobmax3 = 0.6694444444444444
+	    ditregrid=2
+        max_blocks=10000
+ /
+
+ &paramlist
+        typecourant='maxsum'
+        courantpar=0.8d0
+ /
+
+ &mhd_list
+        mhd_energy=.false.
+        mhd_adiab=1.0d0
+        mhd_magnetofriction=.true.
+        boundary_divbfix_skip(1)=1
+ /
+        boundary_divbfix_skip(3)=2
+        boundary_divbfix_skip(4)=2
+        boundary_divbfix_skip(5)=2
+        boundary_divbfix_skip(6)=2
+
+ &mf_list
+        mf_it_max= 80000
+        mf_ditsave=10000
+        mf_cc=0.5
+        mf_cy=0.3
+        mf_cy_max=0.3
+        mf_cdivb=0.01
+        mf_cdivb_max=0.05
+        mf_tvdlfeps=1.0
+        mf_tvdlfeps_min=1.8d-4
+ /

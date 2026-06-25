@@ -1,0 +1,102 @@
+!$AMRVAC_DIR/setup.pl -d=3
+
+ &filelist
+	    base_filename='./data/mhd_eru'
+        saveprim=.True.
+        restart_from_file='../mf/data/mhd_rbsl0000.dat'
+        firstprocess=.True.
+        autoconvert = .T.
+        convert_type='vtuBmpi'
+        nwauxio= 4
+ /
+       restart_from_file='../mf/data/nlfff_gas0007.dat'
+       restart_from_file='../pfss/data/lfff_rbsl_rope0000.dat'
+        snapshotnext=222
+        autoconvert=.true.
+        convert_type='vtuBmpi'
+        nwauxio=0
+
+ &savelist
+        ditsave_log=200
+        itsave(1,1)=0
+        itsave(1,2)=0
+        dtsave_dat=0.02
+ /
+        ditsave_dat=1
+
+ &stoplist
+        dtmin=1.D-16
+        it_max=300000
+        time_max=2.0
+        reset_time=T
+ /
+
+ &methodlist
+        time_stepper='threestep'
+        flux_scheme=20*'hll'
+        limiter=20*'koren'
+        small_pressure=1.0d-8
+        small_density=1.0d0
+        fix_small_values=T
+        small_values_method='replace'
+ /
+
+ &boundlist
+        typeboundary_min1 = 8*'special'
+        typeboundary_max1 = 8*'special'
+        typeboundary_min2 = 8*'special'
+        typeboundary_max2 = 8*'special'
+        typeboundary_min3 = 8*'special'
+        typeboundary_max3 = 8*'special'
+ /
+
+ &meshlist
+        refine_criterion=3
+        refine_max_level=1
+        refine_threshold=20*0.2d0
+        derefine_ratio=20*0.1d0
+        w_refine_weight(1)=0.4d0
+        w_refine_weight(5)=0.2d0
+        w_refine_weight(6)=0.2d0
+        w_refine_weight(7)=0.2d0
+        block_nx1=20
+        block_nx2=20
+        block_nx3=20
+        domain_nx1= 200
+        domain_nx2= 200
+        domain_nx3= 360
+        xprobmin1= 1.001d0
+        xprobmax1= 1.801d0
+        xprobmin2= 0.1388888888888889d0
+        xprobmax2= 0.25d0
+        xprobmin3= 0.48055555555555557d0
+        xprobmax3= 0.6805555555555556d0
+	ditregrid=2
+        max_blocks=10000
+ /
+
+ &paramlist
+        typecourant='maxsum'
+        courantpar=0.8d0
+ /
+
+ &mhd_list
+        mhd_energy=.true.
+        mhd_internal_e = .true.
+        mhd_viscosity=.false.
+        mhd_gamma=1.666667d0
+        mhd_eta=0.0d0
+        mhd_adiab=0.0d0
+        mhd_gravity = .true.
+        boundary_divbfix_skip(1)=1
+        source_split_divb=.true.
+        divbdiff = 0.1
+ /
+        boundary_divbfix_skip(3)=2
+        boundary_divbfix_skip(4)=2
+        boundary_divbfix_skip(5)=2
+        boundary_divbfix_skip(6)=2
+
+ &vc_list
+        vc_mu=0.05d0
+/

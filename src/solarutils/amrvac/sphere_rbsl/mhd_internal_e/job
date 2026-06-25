@@ -1,0 +1,15 @@
+#!/bin/bash
+#BSUB -q mpi
+#BSUB -n 320
+#BSUB -J mhd
+
+TIME_STAMP=$(date +"%Y%m%d_%H%M")
+OUT_LOG="${TIME_STAMP}.out"
+ERR_LOG="${TIME_STAMP}.err"
+
+exec > "$OUT_LOG"
+exec 2> "$ERR_LOG"
+
+echo "Job started at $(date)"
+mpirun -np 320 ./amrvac
+echo "Job finished at $(date)"s

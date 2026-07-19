@@ -14,8 +14,8 @@ from sunpy.map import Map
 from solarutils.obs.maps import aia_prep, aia_psf_path, derotate_to_reference, get_submap
 
 
-DEFAULT_INPUT_DIR = Path("data/test/observations/20241008_2300_2400/sdo/aia")
-DEFAULT_OUTPUT_DIR = Path("data/test/processed/observations/20241008_2300_2400/sdo/aia")
+DEFAULT_INPUT_DIR = Path("cases/20241008/data/2300_2400/sdo/aia")
+DEFAULT_OUTPUT_DIR = Path("cases/20241008/products/processed/observations/2300_2400/sdo/aia")
 DEFAULT_EXTENT = (100.0, 800.0, 150.0, 500.0)
 
 

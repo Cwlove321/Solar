@@ -13,7 +13,7 @@ from tqdm import tqdm
 from solarutils.plotting import draw_submap_box, plot_hmi_los
 
 
-DEFAULT_INPUT_DIR = Path("data/test/processed/observations/20241008_2300_2400/sdo/hmi_45s/los_derotate_submap_pixel")
+DEFAULT_INPUT_DIR = Path("cases/20241008/products/processed/observations/2300_2400/sdo/hmi_45s/los_derotate_submap_pixel")
 
 
 def main() -> None:

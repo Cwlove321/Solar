@@ -13,8 +13,8 @@ from solarutils.obs.maps import get_submap
 from solarutils.plotting import plot_aia_context_submap
 
 
-DATA_DIR = Path("data/test/observations/20241008_2300_2400/sdo/aia")
-OUTPUT_DIR = Path("data/test/figures/observations/sdo/aia")
+DATA_DIR = Path("cases/20241008/data/2300_2400/sdo/aia")
+OUTPUT_DIR = Path("cases/20241008/products/figures/observations/2300_2400/sdo/aia")
 
 EXAMPLES = {
     "aia171_context_submap": {

@@ -17,6 +17,7 @@ from solarutils.obs.chase import (
     nearest_wavelength_index,
     solar_rotation_los_velocity_map,
 )
+from solarutils.obs.dave4vm import calculate_dave4vm, do_dave4vm, odiff
 from solarutils.obs.download import (
     HMI_SERIES_ALIASES,
     SearchPlan,
@@ -49,6 +50,7 @@ from solarutils.obs.maps import (
     sharpen_map,
 )
 from solarutils.obs.time_distance import line_distance_km, sample_line_data, sample_map_line, time_distance_series
+from solarutils.obs.sharp_boundary import read_sharp_submap
 
 __all__ = [
     "AIA_EUV_WAVELENGTHS",
@@ -61,6 +63,7 @@ __all__ = [
     "aia_prep",
     "aia_psf_path",
     "cache_aia_psfs",
+    "calculate_dave4vm",
     "carrington_rotation_for_time",
     "centroid_line_center",
     "centroid_line_center_map",
@@ -74,6 +77,7 @@ __all__ = [
     "derotate_to_reference",
     "derotate_to_reference_pixel",
     "differential_rotation_rate",
+    "do_dave4vm",
     "doppler_shifted_wavelength",
     "ensure_even_shape",
     "fetch_results",
@@ -82,6 +86,7 @@ __all__ = [
     "load_aia_psf",
     "multiscale_sharpen_map",
     "nearest_wavelength_index",
+    "odiff",
     "pad_extent",
     "search_hmi",
     "search_hmi_mrdailysynframe_polfil",
@@ -94,6 +99,7 @@ __all__ = [
     "solar_rotation_los_velocity_map",
     "sample_line_data",
     "sample_map_line",
+    "read_sharp_submap",
     "line_distance_km",
     "sharpen_map",
     "time_distance_series",

@@ -223,7 +223,7 @@ python workflows/observations/validate_downloads.py data/raw/solar_orbiter
 The local smoke-test data for the first observation workflow is stored under:
 
 ```text
-data/test/observations/20241008_2300_2400/
+cases/20241008/data/2300_2400/
 ```
 
 It covers `2024-10-08T23:00:00` to `2024-10-09T00:00:00` with roughly 10-minute sampling. The
@@ -240,7 +240,7 @@ python workflows/observations/download_observations.py sdo-aia \
   --email your_jsoc_email@example.com \
   --wavelengths 94 131 171 193 211 304 335 \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/sdo/aia \
+  --out cases/20241008/data/2300_2400/sdo/aia \
   --fetch
 
 python workflows/observations/download_observations.py hmi \
@@ -249,7 +249,7 @@ python workflows/observations/download_observations.py hmi \
   --email your_jsoc_email@example.com \
   --series hmi_m_45s \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_45s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_45s \
   --fetch
 
 python workflows/observations/download_observations.py hmi \
@@ -258,7 +258,7 @@ python workflows/observations/download_observations.py hmi \
   --email your_jsoc_email@example.com \
   --series hmi_m_720s \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_720s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_720s \
   --fetch
 
 python workflows/observations/download_observations.py sharp \
@@ -268,7 +268,7 @@ python workflows/observations/download_observations.py sharp \
   --harpnum 12001 \
   --sample-minutes 10 \
   --segments Br Bp Bt bitmap conf_disambig \
-  --out data/test/observations/20241008_2300_2400/sdo/sharp_harp12001 \
+  --out cases/20241008/data/2300_2400/sdo/sharp_harp12001 \
   --fetch
 
 python workflows/observations/download_observations.py stereo-a \
@@ -278,7 +278,7 @@ python workflows/observations/download_observations.py stereo-a \
   --detector EUVI \
   --wavelength 195 \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/stereo_a/euvi_195 \
+  --out cases/20241008/data/2300_2400/stereo_a/euvi_195 \
   --fetch
 
 python workflows/observations/download_observations.py solar-orbiter \
@@ -288,7 +288,7 @@ python workflows/observations/download_observations.py solar-orbiter \
   --level L2 \
   --product eui-fsi174-image \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/solar_orbiter/eui_fsi174 \
+  --out cases/20241008/data/2300_2400/solar_orbiter/eui_fsi174 \
   --fetch
 ```
 

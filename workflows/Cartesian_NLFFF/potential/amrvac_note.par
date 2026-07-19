@@ -1,0 +1,80 @@
+! 势场阶段 amrvac.par 的逐行中文注释版本；用于阅读和修改，不建议直接运行。
+!$AMRVAC_DIR/setup.pl -d=3                         ! 三维笛卡尔问题的 AMRVAC 预处理命令
+
+ &filelist
+        base_filename='data/lfff'                  ! 势场输出前缀：data/lfffNNNN.dat/.vtu
+        saveprim=.true.                             ! 输出原始（primitive）变量
+        autoconvert=.true.                          ! 每次 DAT 输出后自动生成 VTU
+        convert_type='vtuBmpi'                      ! 并行 VTK XML 磁场输出格式
+        nwauxio=6                                   ! 势场阶段写出的辅助诊断变量数
+ /                                                  ! filelist 结束
+        restart_from_file='lfffa0000.dat'           ! 历史 restart 示例；新算例通常不需要该项
+        snapshotnext=1                              ! 历史快照起始编号；新算例建议在 filelist 内显式设置
+        convert=.true.                              ! 历史转换开关；命令行 -convert 时由 AMRVAC 控制
+
+ &savelist
+        itsave(1,1)=0                               ! 不按迭代步数触发第 1 类输出
+        itsave(1,2)=0                               ! 不按迭代步数触发第 2 类输出
+        ditsave_log=1                               ! 每 1 个迭代步记录一次 log
+ /                                                  ! savelist 结束
+        dtsave_dat=2.d0                             ! 历史 DAT 时间间隔；新值应写入 savelist 内
+        ditsave_dat=100                             ! 历史 DAT 迭代步间隔；新值应写入 savelist 内
+
+ &stoplist
+        dtmin=1.D-6                                 ! 最小允许时间步
+        it_max=0                                    ! 最大常规时间步；0 表示不以此条件限制
+ /                                                  ! stoplist 结束
+        time_max=60.d0                              ! 历史最大时间；新值应写入 stoplist 内
+        time_reset=.true.                           ! 历史 restart 时间重置开关；新值应写入 stoplist 内
+
+ &methodlist
+        time_stepper='threestep'                    ! 三步时间推进方法
+        flux_scheme=20*'hll'                        ! 所有变量使用 HLL 数值通量
+        limiter=20*'cada3'                          ! 所有变量使用 CADA3 限制器
+        small_pressure=1.0d-14                      ! 数值压力下限
+        small_density=1.0d-14                       ! 数值密度下限
+ /
+
+ &boundlist
+        typeboundary_min1=7*'special'               ! x 最小侧：7 个变量均调用用户边界
+        typeboundary_max1=7*'special'               ! x 最大侧：7 个变量均调用用户边界
+        typeboundary_min2=7*'special'               ! y 最小侧：7 个变量均调用用户边界
+        typeboundary_max2=7*'special'               ! y 最大侧：7 个变量均调用用户边界
+        typeboundary_min3=7*'special'               ! z 最小侧：观测 Bz 势场底边界
+        typeboundary_max3=7*'special'               ! z 最大侧：用户定义顶部边界
+ /
+
+ &meshlist
+        refine_criterion=3                          ! AMR 细化判据编号
+        refine_max_level=1                          ! 最大 AMR 层级；1 表示无额外细化
+        refine_threshold=20*0.2d0                   ! 各变量触发细化的阈值
+        derefine_ratio=20*0.1d0                     ! 各变量触发退细化的阈值比例
+        w_refine_weight(1)=0.4d0                    ! 第 1 个变量的细化权重
+        w_refine_weight(5)=0.2d0                    ! 第 5 个变量的细化权重
+        w_refine_weight(6)=0.2d0                    ! 第 6 个变量的细化权重
+        w_refine_weight(7)=0.2d0                    ! 第 7 个变量的细化权重
+        block_nx1=10                                ! 每个 block 的 x 向单元数
+        block_nx2=10                                ! 每个 block 的 y 向单元数
+        block_nx3=10                                ! 每个 block 的 z 向单元数
+        domain_nx1=300                              ! 历史示例 x 向基础网格；按本事件物理底图修改
+        domain_nx2=200                              ! 历史示例 y 向基础网格；按本事件物理底图修改
+        domain_nx3=200                              ! 历史示例 z 向基础网格；需与 NLFFF/TMF 对齐
+        xprobmin1=-21.3581569253d0                  ! 历史 x 向物理范围下界（10 Mm 单位）
+        xprobmax1=22.3413968861d0                   ! 历史 x 向物理范围上界（10 Mm 单位）
+        xprobmin2=-14.5665179371d0                  ! 历史 y 向物理范围下界（10 Mm 单位）
+        xprobmax2=14.5665179371d0                   ! 历史 y 向物理范围上界（10 Mm 单位）
+        xprobmin3=0.1d0                             ! z 向下界；底边界上抬 1 Mm
+        xprobmax3=29.1330358743d0                   ! 历史 z 向物理范围上界（10 Mm 单位）
+        ditregrid=2                                 ! 每 2 个迭代步重新评估 AMR 网格
+ /                                                  ! meshlist 结束
+        stretched_grid=.true.                       ! 历史非均匀网格开关；应移入 meshlist 后再启用
+
+ &paramlist
+        typecourant='maxsum'                        ! CFL 时间步采用特征速度贡献之和
+        courantpar=0.8d0                            ! CFL 系数
+ /
+
+ &mhd_list
+        mhd_energy=.false.                          ! 不演化总能量方程
+        mhd_adiab=1.0d0                             ! 等温/势场设置中的有效绝热指数
+ /

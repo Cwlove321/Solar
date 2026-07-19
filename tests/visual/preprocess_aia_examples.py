@@ -14,10 +14,10 @@ from solarutils.plotting import plot_aia_map
 
 
 DEFAULT_INPUT = Path(
-    "data/test/observations/20241008_2300_2400/sdo/aia/"
+    "cases/20241008/data/2300_2400/sdo/aia/"
     "aia.lev1_euv_12s.2024-10-08T230010Z.171.image_lev1.fits"
 )
-DEFAULT_OUTPUT = Path("data/test/figures/observations/sdo/aia/171/preprocess_register_smoke.png")
+DEFAULT_OUTPUT = Path("cases/20241008/products/figures/observations/2300_2400/sdo/aia/171/preprocess_register_smoke.png")
 
 
 def main() -> None:

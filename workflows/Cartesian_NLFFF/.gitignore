@@ -1,0 +1,27 @@
+# AMRVAC build products and event-specific runtime data
+amrvac
+amrvac.h
+makefile
+mod_usr.f
+mod_usr.mod
+*.dat
+*.vtu
+*.pvtu
+*.log
+output.*
+
+data/*
+log/*
+nlfff_boundary/*
+potential/data/*
+potential/log/*
+potential/python/*
+potential/potential_boundary/*
+
+!data/.gitkeep
+!log/.gitkeep
+!nlfff_boundary/.gitkeep
+!potential/data/.gitkeep
+!potential/log/.gitkeep
+!potential/python/.gitkeep
+!potential/potential_boundary/.gitkeep

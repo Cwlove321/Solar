@@ -1,0 +1,17 @@
+# AMRVAC build products and event-specific runtime data
+amrvac
+amrvac.h
+makefile
+mod_usr.f
+mod_usr.mod
+*.dat
+*.vtu
+*.pvtu
+*.log
+output.*
+data/*
+log/*
+python/*
+!data/.gitkeep
+!log/.gitkeep
+!python/.gitkeep

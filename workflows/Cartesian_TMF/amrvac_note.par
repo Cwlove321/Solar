@@ -1,0 +1,82 @@
+! amrvac.par 的逐行中文注释版本；用于阅读和修改，不建议直接作为运行参数文件。
+!setup.pl -d=3                                      ! 三维笛卡尔问题的 AMRVAC 预处理命令
+ &filelist
+        base_filename='data/driven'                 ! 输出文件前缀：DAT/VTU 写为 data/drivenNNNN.*
+        saveprim=.true.                             ! 以原始（primitive）变量形式保存状态量
+        autoconvert=.false.                         ! 是否在每个 DAT 输出后自动转换为指定格式的可视化文件
+        convert_type='vtuBmpi'                      ! 并行 VTK XML（磁场中心量）转换格式
+        nwauxio=0                                   ! 不额外申请写入的辅助变量数量
+        level_io=2                                  ! 输出的 AMR 层级；2 表示包含到指定层级的数据
+        w_write(1)=.false.                          ! 不写出第 1 个基础状态变量；不影响求解
+        w_write(2)=.false.                          ! 不写出第 2 个基础状态变量；不影响求解
+        w_write(3)=.false.                          ! 不写出第 3 个基础状态变量；不影响求解
+        firstprocess=.true.                         ! restart 时调用 usr_transform_w 转换 NLFFF 到 TMF 变量布局
+        restart_from_file='nlfff/data/nlfff0000.dat' ! TMF 的初始三维磁场：最终 NLFFF DAT 文件
+ /
+
+ &savelist
+        itsave(1,1)=0                               ! 不按迭代步数触发第 1 类输出
+        itsave(1,2)=0                               ! 不在指定初始迭代步强制额外输出第 2 类快照
+        dtsave_log=0.2d0                            ! 日志输出的归一化时间间隔
+        dtsave_dat=3.4934654d0                      ! DAT 输出间隔；本模板中对应每物理 1 小时（驱动加速 12 倍）
+ /
+
+ &stoplist
+        time_max=60.0d0                             ! 最大归一化演化时间；必须低于最后一个驱动边界时间
+ /
+
+ &methodlist
+        time_stepper='threestep'                    ! 三步时间推进方法
+        flux_scheme=20*'hll'                        ! 所有变量使用 HLL 数值通量
+        limiter=20*'cada3'                          ! 所有变量使用 CADA3 限制器
+ /
+
+ &boundlist
+        typeboundary_min1=6*'special'               ! x 最小侧：6 个 TMF 变量均调用 specialbound_usr
+        typeboundary_max1=6*'special'               ! x 最大侧：6 个 TMF 变量均调用 specialbound_usr
+        typeboundary_min2=6*'special'               ! y 最小侧：6 个 TMF 变量均调用 specialbound_usr
+        typeboundary_max2=6*'special'               ! y 最大侧：6 个 TMF 变量均调用 specialbound_usr
+        typeboundary_min3=6*'special'               ! z 最小侧（光球底边界）：调用时间驱动边界
+        typeboundary_max3=6*'special'               ! z 最大侧：调用用户定义的顶部边界
+ /
+
+ &meshlist
+        refine_criterion=3                           ! AMR 细化判据编号（Lohner 类误差估计）
+        refine_max_level=1                           ! 最大 AMR 层级；1 表示不额外细化基础网格
+        w_refine_weight(4)=0.3d0                     ! 第 4 个变量在细化误差估计中的权重
+        w_refine_weight(5)=0.3d0                     ! 第 5 个变量在细化误差估计中的权重
+        w_refine_weight(6)=0.4d0                     ! 第 6 个变量在细化误差估计中的权重
+        refine_threshold=20*0.2d0                    ! 各变量触发细化的阈值
+        derefine_ratio=20*0.1d0                      ! 各变量触发退细化的阈值比例
+        block_nx1=10                                 ! 每个 AMR block 在 x 方向的单元数
+        block_nx2=10                                 ! 每个 AMR block 在 y 方向的单元数
+        block_nx3=10                                 ! 每个 AMR block 在 z 方向的单元数
+        domain_nx1=300                               ! 基础计算域 x 方向总单元数
+        domain_nx2=150                               ! 基础计算域 y 方向总单元数
+        domain_nx3=150                               ! 基础计算域 z 方向总单元数
+        xprobmin1=-10.992375d0                       ! x 方向物理范围下界（单位为 10 Mm）
+        xprobmax1=10.992375d0                        ! x 方向物理范围上界（单位为 10 Mm）
+        xprobmin2=-5.4961875d0                       ! y 方向物理范围下界（单位为 10 Mm）
+        xprobmax2=5.4961875d0                        ! y 方向物理范围上界（单位为 10 Mm）
+        xprobmin3=0.100000d0                         ! z 方向下界；将底边界抬高 1 Mm
+        xprobmax3=10.992375d0                        ! z 方向上界（本例取 y 向物理长度）
+        ditregrid=20                                 ! 每 20 个时间步重新评估 AMR 网格
+        max_blocks=80000                             ! 允许分配的 AMR block 最大数，限制内存上限
+ /
+
+ &paramlist
+        typecourant='maxsum'                         ! CFL 时间步采用所有波速贡献之和
+        courantpar=0.8d0                             ! CFL 系数；越大时间步越长但稳定性裕量越小
+ /
+
+ &mf_list
+        typedivbfix = 'linde'                        ! 使用 Linde 法控制磁场散度误差
+        mf_decay_scale(1)=0.02d0                     ! 第 1 个磁摩擦衰减/平滑尺度
+        mf_decay_scale(2)=0.02d0                     ! 第 2 个磁摩擦衰减/平滑尺度
+        mf_decay_scale(3)=0.02d0                     ! 第 3 个磁摩擦衰减/平滑尺度
+        mf_decay_scale(4)=0.02d0                     ! 第 4 个磁摩擦衰减/平滑尺度
+        mf_decay_scale(5)=0.005d0                    ! 第 5 个磁摩擦衰减/平滑尺度
+        mf_decay_scale(6)=0.05d0                     ! 第 6 个磁摩擦衰减/平滑尺度
+        mf_eta=-1.0d-3                               ! 磁摩擦有效电阻率；负值启用相应模型约定
+        boundary_divbfix_skip(5)=1                   ! 底部特殊边界跳过指定散度修正步骤
+ /

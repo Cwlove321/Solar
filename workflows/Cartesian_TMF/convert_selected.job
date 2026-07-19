@@ -1,0 +1,14 @@
+#!/bin/bash
+#BSUB -n 64
+#BSUB -R "span[ptile=64]"
+#BSUB -q mpi
+#BSUB -J tmf_vtu_noaa11283
+#BSUB -W 02:00
+
+TIME_STAMP=$(date +"%Y%m%d_%H%M")
+mkdir -p ./log
+exec > "./log/${TIME_STAMP}_convert.out" 2> "./log/${TIME_STAMP}_convert.err"
+
+for index in 4 9 14 19 23; do
+  printf '64\n' | /share/home/guoyang1/codes/amrvac/tools/aiconvert convert.par "${index}"
+done

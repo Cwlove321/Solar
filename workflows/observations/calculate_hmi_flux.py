@@ -18,10 +18,10 @@ from solarutils.plotting import draw_submap_box, plot_hmi_los
 
 
 DEFAULT_INPUT = Path(
-    "data/test/processed/observations/20241008_2300_2400/sdo/hmi_45s/sub_m45"
+    "cases/20241008/products/processed/observations/2300_2400/sdo/hmi_45s/sub_m45"
 )
-DEFAULT_OUTPUT = Path("data/test/processed/observations/20241008_2300_2400/sdo/hmi_45s/flux/hmi45_flux.npz")
-DEFAULT_FIGURE_DIR = Path("data/test/figures/observations/20241008_2300_2400/sdo/hmi_45s/flux")
+DEFAULT_OUTPUT = Path("cases/20241008/products/processed/observations/2300_2400/sdo/hmi_45s/flux/hmi45_flux.npz")
+DEFAULT_FIGURE_DIR = Path("cases/20241008/products/figures/observations/2300_2400/sdo/hmi_45s/flux")
 DEFAULT_EXTENT = (200.0, 500.0, 220.0, 420.0)
 
 

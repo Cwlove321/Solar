@@ -18,6 +18,7 @@ dependencies = [
   "astropy",
   "sunpy",
   "drms",
+  "tqdm",
 ]
 
 [project.optional-dependencies]

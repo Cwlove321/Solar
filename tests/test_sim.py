@@ -32,12 +32,14 @@ from solarutils.sim.spherical import (
     patch_bounds_from_lon_lat,
     pfss_amrvac_parameters,
     pfss_mod_usr_parameters,
+    resample_mrdailysynframe,
     resample_great_circle_path,
     spherical_cap_flux,
     spherical_flux_balance,
     spherical_preprocess_metrics,
     spherical_to_cartesian,
     read_path_dat,
+    refined_ghost_cells,
     preprocess_spherical_field,
     write_path_dat,
     write_cutout,
@@ -359,6 +361,64 @@ def test_preprocess_spherical_field_reduces_force_torque_metric():
     assert after["l12_force_torque"] < before["l12_force_torque"]
 
 
+def test_preprocess_spherical_field_keeps_ghost_cells_fixed():
+    rng = np.random.default_rng(4321)
+    theta = np.linspace(0.4, 1.2, 12)
+    phi = np.linspace(0.1, 1.1, 14)
+    br = rng.normal(size=(theta.size, phi.size))
+    bt = rng.normal(scale=0.4, size=br.shape)
+    bp = rng.normal(scale=0.4, size=br.shape)
+
+    brn, btn, bpn = preprocess_spherical_field(
+        br,
+        bt,
+        bp,
+        theta,
+        phi,
+        mu3=0.1,
+        mu4=1.0,
+        max_iter=5,
+        nghost=2,
+    )
+
+    ghost = np.ones(br.shape, dtype=bool)
+    ghost[2:-2, 2:-2] = False
+    assert np.array_equal(brn[ghost], br[ghost])
+    assert np.array_equal(btn[ghost], bt[ghost])
+    assert np.array_equal(bpn[ghost], bp[ghost])
+    assert not np.array_equal(brn[~ghost], br[~ghost])
+
+
+def test_preprocess_spherical_field_rolls_back_loss_increase():
+    rng = np.random.default_rng(7)
+    theta = np.linspace(0.4, 1.2, 10)
+    phi = np.linspace(0.1, 1.1, 12)
+    br = rng.normal(size=(theta.size, phi.size))
+    bt = rng.normal(scale=0.4, size=br.shape)
+    bp = rng.normal(scale=0.4, size=br.shape)
+    progress = []
+
+    brn, btn, bpn = preprocess_spherical_field(
+        br,
+        bt,
+        bp,
+        theta,
+        phi,
+        mu3=0.1,
+        mu4=1.0,
+        scl=10.0,
+        max_iter=5,
+        dt=1,
+        progress=progress.append,
+    )
+
+    assert len(progress) == 2
+    assert progress[1]["loss"] > progress[0]["loss"]
+    assert np.allclose(brn, br)
+    assert np.allclose(btn, bt)
+    assert np.allclose(bpn, bp)
+
+
 def test_hmi_disambiguate_azimuth_applies_selected_bit():
     azimuth = np.array([[10.0, 20.0], [30.0, 40.0]])
     disambig = np.array([[0, 2], [4, 6]])
@@ -391,6 +451,23 @@ def test_spherical_flux_balance_uses_cos_latitude_weight():
     assert np.isclose(flux["balance"], 0.25)
 
 
+def test_resample_mrdailysynframe_conserves_flux_and_covers_poles():
+    source = np.arange(48, dtype=float).reshape(4, 12)
+
+    resampled, longitude, latitude = resample_mrdailysynframe(source, 30.0)
+
+    assert np.array_equal(latitude, [-75.0, -45.0, -15.0, 15.0, 45.0, 75.0])
+    assert np.array_equal(longitude, np.arange(-165.0, 180.0, 30.0))
+    assert np.isfinite(resampled).all()
+
+    source_cell_area = (2.0 / source.shape[0]) * (2.0 * np.pi / source.shape[1])
+    target_mu_width = np.diff(np.sin(np.radians(np.arange(-90.0, 91.0, 30.0))))
+    target_lon_width = np.radians(30.0)
+    source_flux = np.sum(source) * source_cell_area
+    target_flux = np.sum(resampled * target_mu_width[:, None]) * target_lon_width
+    assert np.isclose(target_flux, source_flux)
+
+
 def test_pfss_parameter_helpers_match_notebook_indexing():
     x0, y0, nx, ny = patch_bounds_from_lon_lat((-7.0, 65.0), (0.0, 40.0), 0.05)
 
@@ -408,6 +485,12 @@ def test_pfss_parameter_helpers_match_notebook_indexing():
     assert amrvac["domain_nx3"] == 1440
     assert np.isclose(amrvac["xprobmin1"], 1.001)
     assert np.isclose(amrvac["xprobmax1"], 1.801)
+
+
+def test_refined_ghost_cells_matches_idl_ngl_formula():
+    assert refined_ghost_cells() == 2
+    assert refined_ghost_cells(2, 2) == 4
+    assert refined_ghost_cells(2, 3) == 8
 
 
 def test_match_template_location_finds_inserted_patch():

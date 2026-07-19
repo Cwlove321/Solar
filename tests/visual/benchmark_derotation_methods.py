@@ -12,9 +12,9 @@ from sunpy.map import Map
 from solarutils.obs.maps import derotate_to_reference, get_submap
 
 
-DEFAULT_AIA_DIR = Path("data/test/observations/20241008_2300_2400/sdo/aia")
-DEFAULT_HMI_DIR = Path("data/test/observations/20241008_2300_2400/sdo/hmi_45s")
-DEFAULT_OUTPUT = Path("data/test/processed/benchmarks/derotation_methods.txt")
+DEFAULT_AIA_DIR = Path("cases/20241008/data/2300_2400/sdo/aia")
+DEFAULT_HMI_DIR = Path("cases/20241008/data/2300_2400/sdo/hmi_45s")
+DEFAULT_OUTPUT = Path("data/benchmarks/derotation_methods.txt")
 DEFAULT_EXTENT = (100.0, 800.0, 150.0, 500.0)
 
 

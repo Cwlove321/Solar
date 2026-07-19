@@ -22,7 +22,7 @@ dist/
 venv/
 env/
 
-# Large scientific data and generated products
+# Local case studies and scientific data are never uploaded.
 cases/
 data/
 tmp/
@@ -46,13 +46,11 @@ tmp/
 src/solarutils/amrvac/**/amrvac
 src/solarutils/amrvac/**/output.*
 
-# Generated figures are tracked only when intentionally added under cases/*/figures/final
+# Generated figures are not committed.
 *.png
 *.pdf
 *.eps
 
-!cases/**/figures/final/*.png
-!cases/**/figures/final/*.pdf
-!cases/**/README.md
-!cases/**/data_manifest.md
-!cases/**/config.yaml
+# Small response tables are source data required by the vendored radiation tools.
+!Packages/radsyn_tools/DDA_method1/AIA_response/*.npz
+!Packages/radsyn_tools/DDA_method2/AIA_response/*.npz

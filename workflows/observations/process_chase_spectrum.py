@@ -23,7 +23,7 @@ from solarutils.plotting import plot_chase_channel, plot_chase_doppler_velocity
 
 
 DEFAULT_INPUT = Path("/Volumes/Seagate/case/20241009/data/chase/RSM20241008T232012_0003_HA.fits")
-DEFAULT_OUTPUT_DIR = Path("data/test/figures/observations/20241008_2300_2400/chase")
+DEFAULT_OUTPUT_DIR = Path("cases/20241008/products/figures/observations/2300_2400/chase")
 DEFAULT_EXTENT = (100.0, 800.0, 150.0, 500.0)
 DEFAULT_VELOCITIES = (-40.0, -20.0, 0.0, 20.0, 40.0)
 

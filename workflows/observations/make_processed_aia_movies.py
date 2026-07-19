@@ -9,8 +9,8 @@ from pathlib import Path
 from solarutils.plotting import MOVIE_QUALITY_PRESETS, make_movie_from_images
 
 
-DEFAULT_INPUT_DIR = Path("data/test/figures/observations/20241008_2300_2400/sdo/aia/processed")
-DEFAULT_OUTPUT_DIR = Path("data/test/movies/observations/20241008_2300_2400/sdo/aia")
+DEFAULT_INPUT_DIR = Path("cases/20241008/products/figures/observations/2300_2400/sdo/aia/processed")
+DEFAULT_OUTPUT_DIR = Path("cases/20241008/products/movies/observations/2300_2400/sdo/aia")
 
 
 def main() -> None:

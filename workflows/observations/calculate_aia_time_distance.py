@@ -11,10 +11,10 @@ from solarutils.obs import time_distance_series
 
 
 DEFAULT_INPUT = Path(
-    "data/test/processed/observations/20241008_2300_2400/sdo/aia/0193/prep_psf_derotate_submap"
+    "cases/20241008/products/processed/observations/2300_2400/sdo/aia/0193/prep_psf_derotate_submap"
 )
 DEFAULT_OUTPUT = Path(
-    "data/test/processed/observations/20241008_2300_2400/sdo/aia/0193/time_distance/aia193_time_distance.npz"
+    "cases/20241008/products/processed/observations/2300_2400/sdo/aia/0193/time_distance/aia193_time_distance.npz"
 )
 DEFAULT_START = (200.0, 260.0)
 DEFAULT_END = (720.0, 430.0)

@@ -7,7 +7,8 @@ from pathlib import Path
 
 import numpy as np
 from scipy.ndimage import laplace
-from scipy.interpolate import RegularGridInterpolator
+from scipy.ndimage import map_coordinates
+from scipy.sparse import csr_matrix
 
 
 DEGREE = np.pi / 180.0
@@ -467,6 +468,144 @@ def image_magnetic_to_spherical_components(x, y, bx, by, bz, theta_deg, rsun):
     return r, np.degrees(theta_s), np.degrees(phi_s), br, bt, bp
 
 
+def load_hmi_br_on_stonyhurst(
+    field_path,
+    inclination_path,
+    azimuth_path,
+    disambig_path,
+    lon,
+    lat,
+    *,
+    disambig_method: int = 2,
+):
+    """Sample HMI vector data onto a Stonyhurst lon/lat grid and return `Br`.
+
+    `lon` and `lat` are one-dimensional center arrays in degrees. The returned
+    array has shape `(len(lat), len(lon))`.
+    """
+
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+    from sunpy.coordinates import frames
+    from sunpy.map import Map
+
+    missing = [
+        name
+        for name, value in [
+            ("inclination_path", inclination_path),
+            ("azimuth_path", azimuth_path),
+            ("disambig_path", disambig_path),
+        ]
+        if value is None
+    ]
+    if missing:
+        raise ValueError(f"{', '.join(missing)} must be provided with field_path")
+
+    lon = np.asarray(lon, dtype=float)
+    lat = np.asarray(lat, dtype=float)
+    if lon.ndim != 1 or lat.ndim != 1 or lon.size == 0 or lat.size == 0:
+        raise ValueError("lon and lat must be non-empty one-dimensional arrays")
+
+    field = Map(field_path).rotate()
+    inclination = Map(inclination_path).rotate()
+    azimuth = Map(azimuth_path).rotate()
+    disambig = Map(disambig_path).rotate(missing=0)
+    corrected_azimuth = hmi_disambiguate_azimuth(azimuth.data, disambig.data, method=disambig_method)
+    bx, by, bz = hmi_vector_components(field.data, inclination.data, corrected_azimuth)
+    map_bx = Map(bx, field.meta)
+    map_by = Map(by, field.meta)
+    map_bz = Map(bz, field.meta)
+
+    lon2, lat2 = np.meshgrid(lon, lat)
+    coords_hgs = SkyCoord(
+        lon2.ravel() * u.degree,
+        lat2.ravel() * u.degree,
+        frame=frames.HeliographicStonyhurst,
+        obstime=map_bz.date,
+        rsun=map_bz.rsun_meters,
+        observer="earth",
+    )
+    coords_hpc = coords_hgs.transform_to(map_bz.coordinate_frame)
+    pixels = map_bz.world_to_pixel(coords_hpc)
+    pixel_coords = np.array([pixels[1].value, pixels[0].value])
+    bx_select = map_coordinates(map_bx.data, pixel_coords, order=1, mode="constant", cval=np.nan)
+    by_select = map_coordinates(map_by.data, pixel_coords, order=1, mode="constant", cval=np.nan)
+    bz_select = map_coordinates(map_bz.data, pixel_coords, order=1, mode="constant", cval=np.nan)
+    _, _, _, br, _, _ = image_magnetic_to_spherical_components(
+        coords_hpc.Tx.value,
+        coords_hpc.Ty.value,
+        bx_select,
+        by_select,
+        bz_select,
+        map_bz.observer_coordinate.lat.value - 90.0,
+        map_bz.rsun_obs.value,
+    )
+    return br.reshape(lon2.shape)
+
+
+def load_hmi_br_map(
+    field_path,
+    inclination_path,
+    azimuth_path,
+    disambig_path,
+    *,
+    extent_arcsec: tuple[float, float, float, float] | None = None,
+    disambig_method: int = 2,
+):
+    """Return an HMI `Br` SunPy map, optionally cropped to an arcsec extent."""
+
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+    from sunpy.map import Map
+
+    missing = [
+        name
+        for name, value in [
+            ("inclination_path", inclination_path),
+            ("azimuth_path", azimuth_path),
+            ("disambig_path", disambig_path),
+        ]
+        if value is None
+    ]
+    if missing:
+        raise ValueError(f"{', '.join(missing)} must be provided with field_path")
+
+    def _submap_from_extent(smap, extent):
+        bottom_left = SkyCoord(extent[0] * u.arcsec, extent[2] * u.arcsec, frame=smap.coordinate_frame)
+        top_right = SkyCoord(extent[1] * u.arcsec, extent[3] * u.arcsec, frame=smap.coordinate_frame)
+        return smap.submap(bottom_left, top_right=top_right)
+
+    field = Map(field_path).rotate()
+    inclination = Map(inclination_path).rotate()
+    azimuth = Map(azimuth_path).rotate()
+    disambig = Map(disambig_path).rotate(missing=0)
+    if extent_arcsec is not None:
+        field = _submap_from_extent(field, extent_arcsec)
+        inclination = _submap_from_extent(inclination, extent_arcsec)
+        azimuth = _submap_from_extent(azimuth, extent_arcsec)
+        disambig = _submap_from_extent(disambig, extent_arcsec)
+
+    corrected_azimuth = hmi_disambiguate_azimuth(azimuth.data, disambig.data, method=disambig_method)
+    bx, by, bz = hmi_vector_components(field.data, inclination.data, corrected_azimuth)
+    ypix, xpix = np.indices(field.data.shape, dtype=float)
+    coords_hpc = field.pixel_to_world(xpix * u.pix, ypix * u.pix)
+    _, _, _, br, _, _ = image_magnetic_to_spherical_components(
+        coords_hpc.Tx.value.ravel(),
+        coords_hpc.Ty.value.ravel(),
+        bx.ravel(),
+        by.ravel(),
+        bz.ravel(),
+        field.observer_coordinate.lat.value - 90.0,
+        field.rsun_obs.value,
+    )
+    meta = field.meta.copy()
+    meta["content"] = "BR"
+    meta["bunit"] = "G"
+    meta["SOLBRMAP"] = 1
+    meta.pop("BLANK", None)
+    return Map(br.reshape(field.data.shape), meta)
+
+
 def lon_lat_centers(
     lon_range: tuple[float, float],
     lat_range: tuple[float, float],
@@ -521,6 +660,237 @@ def spherical_flux_balance(br, latitude_degree):
     }
 
 
+def footpoint_fluxes_from_hmi(
+    footpoints,
+    radius_mm,
+    field_path,
+    inclination_path,
+    azimuth_path,
+    disambig_path,
+    *,
+    solar_radius_mm: float = 696.0,
+    resolution_degree: float = 0.02,
+    disambig_method: int = 2,
+    padding_factor: float = 1.15,
+):
+    """Return spherical `Br` fluxes within a radius around the two footpoints.
+
+    `footpoints` may be a full picked path `(N, 2)` or a two-row array; the
+    first and last rows are treated as the two footpoints. Fluxes are returned
+    in Maxwells (Mx).
+    """
+
+    footpoints = np.asarray(footpoints, dtype=float)
+    if footpoints.ndim != 2 or footpoints.shape[1] != 2 or footpoints.shape[0] < 2:
+        raise ValueError("footpoints must have shape (N, 2) with at least two points")
+
+    radius_mm = float(radius_mm)
+    solar_radius_mm = float(solar_radius_mm)
+    resolution_degree = float(resolution_degree)
+    padding_factor = float(padding_factor)
+    if radius_mm <= 0.0:
+        raise ValueError("radius_mm must be positive")
+    if solar_radius_mm <= 0.0:
+        raise ValueError("solar_radius_mm must be positive")
+    if resolution_degree <= 0.0:
+        raise ValueError("resolution_degree must be positive")
+    if padding_factor < 1.0:
+        raise ValueError("padding_factor must be at least 1")
+
+    endpoints = footpoints[[0, -1]]
+    alpha_rad = radius_mm / solar_radius_mm
+    alpha_deg = np.degrees(alpha_rad)
+    solar_radius_cm = solar_radius_mm * 1e8
+    dlon = np.radians(resolution_degree)
+    dlat = np.radians(resolution_degree)
+
+    results = []
+    for index, (lon0, lat0) in enumerate(endpoints, start=1):
+        lat_half = alpha_deg * padding_factor
+        lon_half = alpha_deg * padding_factor / max(np.cos(np.radians(lat0)), 1e-6)
+        lon = np.arange(lon0 - lon_half, lon0 + lon_half + 0.5 * resolution_degree, resolution_degree)
+        lat = np.arange(lat0 - lat_half, lat0 + lat_half + 0.5 * resolution_degree, resolution_degree)
+        br = load_hmi_br_on_stonyhurst(
+            field_path,
+            inclination_path,
+            azimuth_path,
+            disambig_path,
+            lon,
+            lat,
+            disambig_method=disambig_method,
+        )
+        lon2, lat2 = np.meshgrid(lon, lat)
+        distance_degree = angular_distance(lon0, lat0, lon2, lat2)
+        mask = np.isfinite(br) & (distance_degree <= alpha_deg)
+        area_cm2 = solar_radius_cm**2 * np.cos(np.radians(lat2)) * dlon * dlat
+        signed_flux = float(np.nansum(br[mask] * area_cm2[mask]))
+        positive_flux = float(np.nansum(np.where(br[mask] > 0.0, br[mask] * area_cm2[mask], 0.0)))
+        negative_flux = float(np.nansum(np.where(br[mask] < 0.0, br[mask] * area_cm2[mask], 0.0)))
+        unsigned_flux = float(np.nansum(np.abs(br[mask]) * area_cm2[mask]))
+        mean_br = float(np.nanmean(br[mask])) if np.any(mask) else np.nan
+        sampled_area = float(np.nansum(area_cm2[mask]))
+        results.append(
+            {
+                "footpoint_index": index,
+                "center_lon_deg": float(lon0),
+                "center_lat_deg": float(lat0),
+                "radius_mm": radius_mm,
+                "angular_radius_deg": float(alpha_deg),
+                "resolution_degree": resolution_degree,
+                "sample_count": int(np.count_nonzero(mask)),
+                "area_cm2": sampled_area,
+                "mean_br_G": mean_br,
+                "signed_flux_Mx": signed_flux,
+                "positive_flux_Mx": positive_flux,
+                "negative_flux_Mx": negative_flux,
+                "unsigned_flux_Mx": unsigned_flux,
+            }
+        )
+
+    return {
+        "radius_mm": radius_mm,
+        "solar_radius_mm": solar_radius_mm,
+        "resolution_degree": resolution_degree,
+        "results": results,
+    }
+
+
+def sample_sunpy_map_on_stonyhurst(map_or_path, lon, lat, *, rotate: bool = False):
+    """Sample a SunPy map onto a Stonyhurst lon/lat grid.
+
+    Parameters
+    ----------
+    map_or_path
+        A SunPy map instance or a FITS path accepted by ``sunpy.map.Map``.
+    lon, lat
+        One-dimensional longitude/latitude center arrays in degrees.
+    rotate
+        Rotate the input map before sampling. This is typically desired for HMI
+        maps whose image ``+Y`` is not solar north.
+
+    Returns
+    -------
+    tuple
+        ``(sampled, smap)`` where ``sampled`` has shape ``(len(lat), len(lon))``
+        and ``smap`` is the prepared SunPy map actually used for sampling.
+    """
+
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+    from sunpy.coordinates import frames
+    from sunpy.map import GenericMap
+    from sunpy.map import Map
+
+    lon = np.asarray(lon, dtype=float)
+    lat = np.asarray(lat, dtype=float)
+    if lon.ndim != 1 or lat.ndim != 1 or lon.size == 0 or lat.size == 0:
+        raise ValueError("lon and lat must be non-empty one-dimensional arrays")
+
+    smap = map_or_path if isinstance(map_or_path, GenericMap) else Map(map_or_path)
+    if rotate:
+        smap = smap.rotate()
+
+    lon2, lat2 = np.meshgrid(lon, lat)
+    coords_hgs = SkyCoord(
+        lon2.ravel() * u.degree,
+        lat2.ravel() * u.degree,
+        frame=frames.HeliographicStonyhurst,
+        obstime=smap.date,
+        rsun=smap.rsun_meters,
+        observer="earth",
+    )
+    coords_hpc = coords_hgs.transform_to(smap.coordinate_frame)
+    pixels = smap.world_to_pixel(coords_hpc)
+    pixel_coords = np.array([pixels[1].value, pixels[0].value])
+    data = map_coordinates(np.asarray(smap.data, dtype=float), pixel_coords, order=1, mode="constant", cval=np.nan)
+    return data.reshape(lat2.shape), smap
+
+
+def footpoint_fluxes_from_hmi_map(
+    footpoints,
+    radius_mm,
+    hmi_map_path,
+    *,
+    solar_radius_mm: float = 696.0,
+    resolution_degree: float = 0.02,
+    padding_factor: float = 1.15,
+    rotate: bool = True,
+):
+    """Return spherical fluxes from a single HMI map around two footpoints.
+
+    This helper works with a single HMI FITS map such as an HMI ``Br`` map or an
+    HMI45 LOS magnetogram. When the input is not radial ``Br``, the caller
+    should label the output explicitly as an LOS-based approximation.
+    """
+
+    footpoints = np.asarray(footpoints, dtype=float)
+    if footpoints.ndim != 2 or footpoints.shape[1] != 2 or footpoints.shape[0] < 2:
+        raise ValueError("footpoints must have shape (N, 2) with at least two points")
+
+    radius_mm = float(radius_mm)
+    solar_radius_mm = float(solar_radius_mm)
+    resolution_degree = float(resolution_degree)
+    padding_factor = float(padding_factor)
+    if radius_mm <= 0.0:
+        raise ValueError("radius_mm must be positive")
+    if solar_radius_mm <= 0.0:
+        raise ValueError("solar_radius_mm must be positive")
+    if resolution_degree <= 0.0:
+        raise ValueError("resolution_degree must be positive")
+    if padding_factor < 1.0:
+        raise ValueError("padding_factor must be at least 1")
+
+    endpoints = footpoints[[0, -1]]
+    alpha_rad = radius_mm / solar_radius_mm
+    alpha_deg = np.degrees(alpha_rad)
+    solar_radius_cm = solar_radius_mm * 1e8
+    dlon = np.radians(resolution_degree)
+    dlat = np.radians(resolution_degree)
+
+    results = []
+    for index, (lon0, lat0) in enumerate(endpoints, start=1):
+        lat_half = alpha_deg * padding_factor
+        lon_half = alpha_deg * padding_factor / max(np.cos(np.radians(lat0)), 1e-6)
+        lon = np.arange(lon0 - lon_half, lon0 + lon_half + 0.5 * resolution_degree, resolution_degree)
+        lat = np.arange(lat0 - lat_half, lat0 + lat_half + 0.5 * resolution_degree, resolution_degree)
+        sampled, _ = sample_sunpy_map_on_stonyhurst(hmi_map_path, lon, lat, rotate=rotate)
+        lon2, lat2 = np.meshgrid(lon, lat)
+        distance_degree = angular_distance(lon0, lat0, lon2, lat2)
+        mask = np.isfinite(sampled) & (distance_degree <= alpha_deg)
+        area_cm2 = solar_radius_cm**2 * np.cos(np.radians(lat2)) * dlon * dlat
+        signed_flux = float(np.nansum(sampled[mask] * area_cm2[mask]))
+        positive_flux = float(np.nansum(np.where(sampled[mask] > 0.0, sampled[mask] * area_cm2[mask], 0.0)))
+        negative_flux = float(np.nansum(np.where(sampled[mask] < 0.0, sampled[mask] * area_cm2[mask], 0.0)))
+        unsigned_flux = float(np.nansum(np.abs(sampled[mask]) * area_cm2[mask]))
+        mean_field = float(np.nanmean(sampled[mask])) if np.any(mask) else np.nan
+        sampled_area = float(np.nansum(area_cm2[mask]))
+        results.append(
+            {
+                "footpoint_index": index,
+                "center_lon_deg": float(lon0),
+                "center_lat_deg": float(lat0),
+                "radius_mm": radius_mm,
+                "angular_radius_deg": float(alpha_deg),
+                "resolution_degree": resolution_degree,
+                "sample_count": int(np.count_nonzero(mask)),
+                "area_cm2": sampled_area,
+                "mean_field_G": mean_field,
+                "mean_br_G": mean_field,
+                "signed_flux_Mx": signed_flux,
+                "positive_flux_Mx": positive_flux,
+                "negative_flux_Mx": negative_flux,
+                "unsigned_flux_Mx": unsigned_flux,
+            }
+        )
+
+    return {
+        "radius_mm": radius_mm,
+        "solar_radius_mm": solar_radius_mm,
+        "resolution_degree": resolution_degree,
+        "results": results,
+    }
+
+
 def preprocess_spherical_field(
     br,
     bt,
@@ -534,11 +904,19 @@ def preprocess_spherical_field(
     max_iter: int = 5000,
     dt: int = 200,
     tol: float = 1e-4,
+    nghost: int = 0,
+    convergence_patience: int = 3,
     progress=None,
 ):
     """Preprocess a spherical vector magnetogram by minimizing force/torque terms.
 
-    This is a direct, vectorized translation of the RBSL notebook routine. It
+    When ``nghost`` is nonzero, it must be at least two: the outer ghost cells
+    remain fixed at their observed values, while force, torque, convergence,
+    and field updates are evaluated only on the core. Two layers are required
+    by the biharmonic smoothing update. A candidate update is rejected and
+    rolled back if its loss is non-finite or fails to decrease. Convergence
+    requires a relative loss improvement below ``tol`` for
+    ``convergence_patience`` consecutive accepted updates. The function
     returns `(Br, Btheta, Bphi)` with the original field scale restored.
     """
 
@@ -551,13 +929,30 @@ def preprocess_spherical_field(
         raise ValueError("br, bt, and bp must have the same shape")
     if br.shape != (theta.size, phi.size):
         raise ValueError("field shape must be (len(theta), len(phi))")
+    nghost = int(nghost)
+    if nghost < 0 or nghost == 1:
+        raise ValueError("nghost must be zero or at least 2")
+    if nghost and (2 * nghost >= br.shape[0] or 2 * nghost >= br.shape[1]):
+        raise ValueError("nghost leaves no non-empty core region")
+    if max_iter < 0:
+        raise ValueError("max_iter must be non-negative")
+    if not np.isfinite(tol) or tol < 0.0:
+        raise ValueError("tol must be finite and non-negative")
+    convergence_patience = int(convergence_patience)
+    if convergence_patience < 1:
+        raise ValueError("convergence_patience must be at least 1")
+    core = (
+        (slice(nghost, -nghost), slice(nghost, -nghost))
+        if nghost
+        else (slice(None), slice(None))
+    )
 
     mu1 = 1.0 * scl
     mu2 = 1.0 * scl
     mu3 = mu3 * scl
     mu4 = mu4 * scl
 
-    bave = np.sqrt(br**2 + bt**2 + bp**2).mean()
+    bave = np.sqrt(br[core] ** 2 + bt[core] ** 2 + bp[core] ** 2).mean()
     if not np.isfinite(bave) or bave == 0:
         raise ValueError("mean field strength must be finite and non-zero")
     br0, bt0, bp0 = br / bave, bt / bave, bp / bave
@@ -565,15 +960,25 @@ def preprocess_spherical_field(
 
     theta2, phi2 = _make_mesh(theta, phi)
     sinth = np.sin(theta2)
-    eb = np.sum(sinth * (bt0**2 + bp0**2 + br0**2))
+    eb = np.sum(sinth[core] * (bt0[core] ** 2 + bp0[core] ** 2 + br0[core] ** 2))
 
     l12_old = 0.0
     l3_old = 0.0
     l4_old = 0.0
-    old_l = np.inf
+    accepted_loss = None
+    rollback_state = None
+    stable_steps = 0
 
     for iteration in range(max_iter + 1):
-        terms = _preprocess_terms(br0, bt0, bp0, theta2, phi2, sinth, eb)
+        terms = _preprocess_terms(
+            br0[core],
+            bt0[core],
+            bp0[core],
+            theta2[core],
+            phi2[core],
+            sinth[core],
+            eb,
+        )
         sin_th = terms["sin_th"]
         cos_th = terms["cos_th"]
         cos_ph = terms["cos_ph"]
@@ -584,9 +989,9 @@ def preprocess_spherical_field(
         term2a = terms["term2a"]
         term2b = terms["term2b"]
         term2c = terms["term2c"]
-        term3a = (br0 - bro) / eb
-        term3b = (bt0 - bto) / eb
-        term3c = (bp0 - bpo) / eb
+        term3a = (br0[core] - bro[core]) / eb
+        term3b = (bt0[core] - bto[core]) / eb
+        term3c = (bp0[core] - bpo[core]) / eb
         term4a = _laplace2(br0) / eb
         term4b = _laplace2(bt0) / eb
         term4c = _laplace2(bp0) / eb
@@ -595,8 +1000,13 @@ def preprocess_spherical_field(
         l2 = term2a**2 + term2b**2 + term2c**2
         l12 = l1 + l2
         l3 = np.sum(term3a**2 + term3b**2 + term3c**2)
-        l4 = np.sum(term4a**2 + term4b**2 + term4c**2)
+        l4 = np.sum(term4a[core] ** 2 + term4b[core] ** 2 + term4c[core] ** 2)
         loss = mu1 * l12 + mu3 * l3 + mu4 * l4
+        if not np.isfinite(loss):
+            if rollback_state is None:
+                raise FloatingPointError("preprocessing produced a non-finite initial loss")
+            br0[core], bt0[core], bp0[core] = rollback_state
+            break
 
         if iteration == 0:
             dloss = 1.0
@@ -622,37 +1032,70 @@ def preprocess_spherical_field(
                 }
             )
 
-        if iteration > 0 and dloss < tol and loss < old_l:
-            break
-        old_l = loss
+        if accepted_loss is not None:
+            relative_improvement = (accepted_loss - loss) / max(abs(accepted_loss), np.finfo(float).eps)
+            if relative_improvement <= 0.0:
+                br0[core], bt0[core], bp0[core] = rollback_state
+                break
+            stable_steps = stable_steps + 1 if relative_improvement < tol else 0
+            if stable_steps >= convergence_patience:
+                break
 
-        br1 = br0 - 2.0 * mu3 * term3a - 2.0 * mu4 * _laplace2(term4a)
+        accepted_loss = loss
+        if iteration == max_iter:
+            break
+        rollback_state = (br0[core].copy(), bt0[core].copy(), bp0[core].copy())
+
+        br_core = br0[core]
+        bt_core = bt0[core]
+        bp_core = bp0[core]
+        br1 = br_core - 2.0 * mu3 * term3a - 2.0 * mu4 * _laplace2(term4a)[core]
         bt1 = (
-            bt0
-            - 2.0 * mu1 * term1a * (bt0 * sin_th * sin_th * cos_ph - br0 * sin_th * cos_th * cos_ph)
-            - 2.0 * mu1 * term1b * (bt0 * sin_th * sin_th * sin_ph - br0 * sin_th * cos_th * sin_ph)
-            - 2.0 * mu1 * term1c * (bt0 * sin_th * cos_th + br0 * sin_th * sin_th)
-            - 2.0 * mu2 * (term2a * br0 * sin_th * sin_ph - term2b * br0 * sin_th * cos_ph)
+            bt_core
+            - 2.0
+            * mu1
+            * term1a
+            * (bt_core * sin_th * sin_th * cos_ph - br_core * sin_th * cos_th * cos_ph)
+            - 2.0
+            * mu1
+            * term1b
+            * (bt_core * sin_th * sin_th * sin_ph - br_core * sin_th * cos_th * sin_ph)
+            - 2.0 * mu1 * term1c * (bt_core * sin_th * cos_th + br_core * sin_th * sin_th)
+            - 2.0
+            * mu2
+            * (term2a * br_core * sin_th * sin_ph - term2b * br_core * sin_th * cos_ph)
             - 2.0 * mu3 * term3b
-            - 2.0 * mu4 * _laplace2(term4b)
+            - 2.0 * mu4 * _laplace2(term4b)[core]
         )
         bp1 = (
-            bp0
-            - 2.0 * mu1 * term1a * (bp0 * sin_th * sin_th * cos_ph + br0 * sin_th * sin_ph)
-            - 2.0 * mu1 * term1b * (bp0 * sin_th * sin_th * sin_ph - br0 * sin_th * cos_ph)
-            - 2.0 * mu1 * term1c * (bp0 * sin_th * cos_th)
+            bp_core
+            - 2.0
+            * mu1
+            * term1a
+            * (bp_core * sin_th * sin_th * cos_ph + br_core * sin_th * sin_ph)
+            - 2.0
+            * mu1
+            * term1b
+            * (bp_core * sin_th * sin_th * sin_ph - br_core * sin_th * cos_ph)
+            - 2.0 * mu1 * term1c * (bp_core * sin_th * cos_th)
             - 2.0
             * mu2
             * (
-                term2a * br0 * cos_th * cos_ph * sin_th
-                + term2b * br0 * cos_th * sin_ph * sin_th
-                + term2c * br0 * sin_th * sin_th
+                term2a * br_core * cos_th * cos_ph * sin_th
+                + term2b * br_core * cos_th * sin_ph * sin_th
+                + term2c * br_core * sin_th * sin_th
             )
             - 2.0 * mu3 * term3c
-            - 2.0 * mu4 * _laplace2(term4c)
+            - 2.0 * mu4 * _laplace2(term4c)[core]
         )
-        br0, bt0, bp0 = br1, bt1, bp1
+        br0[core], bt0[core], bp0[core] = br1, bt1, bp1
 
+    if nghost:
+        br_out, bt_out, bp_out = br.copy(), bt.copy(), bp.copy()
+        br_out[core] = br0[core] * bave
+        bt_out[core] = bt0[core] * bave
+        bp_out[core] = bp0[core] * bave
+        return br_out, bt_out, bp_out
     return br0 * bave, bt0 * bave, bp0 * bave
 
 
@@ -700,30 +1143,43 @@ def spherical_preprocess_metrics(br, bt, bp, theta, phi):
 
 
 def resample_mrdailysynframe(data, resolution_degree: float):
-    """Resample an HMI `mrdailysynframe_polfil` map onto regular lon/lat centers.
+    """Conservatively resample an HMI synoptic map onto regular lon/lat cells.
 
-    The HMI map latitude coordinate is uniform in `sin(latitude)`. The returned
-    `lon` and `lat` arrays are in degrees and the data shape is `(lat, lon)`.
+    The source cells are uniform in longitude and `sin(latitude)`. Values are
+    remapped by spherical cell-overlap area, preserving the discrete surface
+    integral over the full sphere. The returned `lon` and `lat` arrays contain
+    target cell centers in degrees and the data shape is `(lat, lon)`.
     """
 
     data = np.asarray(data, dtype=float)
-    ny, nx = data.shape
-    coord_sinlat = np.arcsin(np.linspace(-1.0, 1.0, ny))
-    coord_lon = (np.arange(nx) - nx / 2.0 + 0.5) * (360.0 / nx) * np.pi / 180.0
-    interpolator = RegularGridInterpolator(
-        (coord_sinlat, coord_lon),
-        data,
-        bounds_error=False,
-        fill_value=np.nan,
-    )
+    if data.ndim != 2:
+        raise ValueError("data must be a 2D (latitude, longitude) array")
+    resolution_degree = float(resolution_degree)
+    if not np.isfinite(resolution_degree) or resolution_degree <= 0.0:
+        raise ValueError("resolution_degree must be finite and positive")
 
-    lon = np.arange(-180.0, 180.0, resolution_degree) + resolution_degree / 2.0
-    lat = np.arange(-90.0, 90.0, resolution_degree) + resolution_degree / 2.0
-    lon_rad = np.radians(lon)
-    lat_rad = np.radians(lat)
-    lon_grid, lat_grid = np.meshgrid(lon_rad, lat_rad)
-    points = np.column_stack([lat_grid.ravel(), lon_grid.ravel()])
-    resampled = interpolator(points).reshape(lat_grid.shape)
+    ny, nx = data.shape
+    nlon = int(np.round(360.0 / resolution_degree))
+    nlat = int(np.round(180.0 / resolution_degree))
+    if not np.isclose(nlon * resolution_degree, 360.0) or not np.isclose(
+        nlat * resolution_degree, 180.0
+    ):
+        raise ValueError("resolution_degree must evenly divide both 180 and 360 degrees")
+
+    lon_edges = np.linspace(-180.0, 180.0, nlon + 1)
+    lat_edges = np.linspace(-90.0, 90.0, nlat + 1)
+    lon = 0.5 * (lon_edges[:-1] + lon_edges[1:])
+    lat = 0.5 * (lat_edges[:-1] + lat_edges[1:])
+
+    source_mu_edges = np.linspace(-1.0, 1.0, ny + 1)
+    target_mu_edges = np.sin(np.radians(lat_edges))
+    source_lon_edges = np.linspace(-np.pi, np.pi, nx + 1)
+    target_lon_edges = np.radians(lon_edges)
+
+    latitude_weights = _conservative_overlap_weights(source_mu_edges, target_mu_edges)
+    longitude_weights = _conservative_overlap_weights(source_lon_edges, target_lon_edges)
+    resampled_lon = (longitude_weights @ data.T).T
+    resampled = latitude_weights @ resampled_lon
     return resampled, lon, lat
 
 
@@ -802,6 +1258,18 @@ def pfss_mod_usr_parameters(global_shape, x0: int, y0: int, nx: int, ny: int):
     }
 
 
+def refined_ghost_cells(base_nghost: int = 2, refine_level: int = 1):
+    """Return the IDL/RBSL ghost width at a given AMR refinement level."""
+
+    base_nghost = int(base_nghost)
+    refine_level = int(refine_level)
+    if base_nghost < 0:
+        raise ValueError("base_nghost must be non-negative")
+    if refine_level < 1:
+        raise ValueError("refine_level must be at least 1")
+    return base_nghost * 2 ** (refine_level - 1)
+
+
 def pfss_amrvac_parameters(
     global_shape,
     x0: int,
@@ -812,8 +1280,13 @@ def pfss_amrvac_parameters(
     nr: int,
     length_r: float,
     refine_level: int = 1,
+    inner_radius: float = 1.001,
 ):
-    """Return domain settings for `pfss_amrvac.par`."""
+    """Return domain settings for `pfss_amrvac.par`.
+
+    ``inner_radius=1.001`` matches the bundled PFSS/RBSL templates and keeps the
+    numerical inner boundary just above the photosphere.
+    """
 
     pfss_ny, pfss_nx = global_shape
     divisor = 2 ** (int(refine_level) - 1)
@@ -821,8 +1294,8 @@ def pfss_amrvac_parameters(
         "domain_nx1": ny / divisor,
         "domain_nx2": ny / divisor,
         "domain_nx3": nx / divisor,
-        "xprobmin1": 1.0 + 0.5 * length_r / nr,
-        "xprobmax1": 1.0 + 0.5 * length_r / nr + length_r,
+        "xprobmin1": float(inner_radius),
+        "xprobmax1": float(inner_radius) + length_r,
         "xprobmin2": (pfss_ny - y0 - ny) / pfss_ny * 0.5,
         "xprobmax2": (pfss_ny - y0) / pfss_ny * 0.5,
         "xprobmin3": x0 / pfss_nx,
@@ -874,9 +1347,55 @@ def write_cutout(path, br, bt, bp, *, scale: float = 1.0, rotate: bool = True):
     return path
 
 
+def _conservative_overlap_weights(source_edges, target_edges):
+    """Return sparse weights for conservative averages between 1D cells."""
+
+    source_edges = np.asarray(source_edges, dtype=float)
+    target_edges = np.asarray(target_edges, dtype=float)
+    if source_edges.ndim != 1 or target_edges.ndim != 1:
+        raise ValueError("source_edges and target_edges must be 1D")
+    if source_edges.size < 2 or target_edges.size < 2:
+        raise ValueError("source_edges and target_edges must define at least one cell")
+    if np.any(np.diff(source_edges) <= 0.0) or np.any(np.diff(target_edges) <= 0.0):
+        raise ValueError("cell edges must be strictly increasing")
+    if not np.isclose(source_edges[0], target_edges[0]) or not np.isclose(
+        source_edges[-1], target_edges[-1]
+    ):
+        raise ValueError("source and target grids must cover the same interval")
+
+    rows = []
+    columns = []
+    values = []
+    source_index = 0
+    source_count = source_edges.size - 1
+    for target_index, (left, right) in enumerate(zip(target_edges[:-1], target_edges[1:], strict=True)):
+        while source_index < source_count - 1 and source_edges[source_index + 1] <= left:
+            source_index += 1
+
+        index = source_index
+        target_width = right - left
+        while index < source_count and source_edges[index] < right:
+            overlap = min(right, source_edges[index + 1]) - max(left, source_edges[index])
+            if overlap > 0.0:
+                rows.append(target_index)
+                columns.append(index)
+                values.append(overlap / target_width)
+            if source_edges[index + 1] >= right:
+                break
+            index += 1
+
+    weights = csr_matrix(
+        (values, (rows, columns)),
+        shape=(target_edges.size - 1, source_edges.size - 1),
+    )
+    row_sums = np.asarray(weights.sum(axis=1)).ravel()
+    if not np.allclose(row_sums, 1.0):
+        raise RuntimeError("conservative remapping weights do not cover every target cell")
+    return weights
+
+
 def _laplace2(field):
-    field_ext = np.hstack([field, field[:, :1]])
-    return laplace(field_ext)[:, :-1]
+    return laplace(field, mode="reflect")
 
 
 def _make_mesh(theta, phi):

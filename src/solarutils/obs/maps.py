@@ -14,7 +14,7 @@ from sunpy.physics.differential_rotation import solar_rotate_coordinate
 
 
 AIA_EUV_WAVELENGTHS = (94, 131, 171, 193, 211, 304, 335)
-DEFAULT_AIA_PSF_DIR = Path("data/test/calibration/sdo/aia/psf")
+DEFAULT_AIA_PSF_DIR = Path("data/calibration/sdo/aia/psf")
 
 
 def aia_prep(

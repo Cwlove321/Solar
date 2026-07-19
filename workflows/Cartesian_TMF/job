@@ -1,0 +1,12 @@
+#!/bin/bash
+#BSUB -n 320
+#BSUB -R "span[ptile=64]"
+#BSUB -q mpi
+#BSUB -J tmf_case
+#BSUB -W 24:00
+
+TIME_STAMP=$(date +"%Y%m%d_%H%M")
+mkdir -p ./log
+exec > "./log/${TIME_STAMP}.out" 2> "./log/${TIME_STAMP}.err"
+
+mpirun -np 320 ./amrvac

@@ -35,7 +35,7 @@ The AIA PSF is a full-disk `4096 x 4096` array. Recomputing it is slow, so the
 test workflow caches common EUV channels locally:
 
 ```text
-data/test/calibration/sdo/aia/psf/
+data/calibration/sdo/aia/psf/
 ├── aia_0094_psf.npz
 ├── aia_0131_psf.npz
 ├── aia_0171_psf.npz
@@ -124,7 +124,7 @@ from aiapy.calibrate.utils import get_pointing_table
 
 from solarutils.obs.maps import aia_prep, aia_psf_path
 
-files = sorted(Path("data/test/observations/20241008_2300_2400/sdo/aia").glob("*193*.fits"))
+files = sorted(Path("cases/20241008/data/2300_2400/sdo/aia").glob("*193*.fits"))
 first_map = Map(files[0])
 pointing_table = get_pointing_table(
     "JSOC",
@@ -203,8 +203,8 @@ the padding away afterward.
 Visual comparison:
 
 ```text
-data/test/figures/observations/sdo/aia/193/local_psf_deconvolution_compare.png
-data/test/figures/observations/sdo/aia/193/local_psf_padding_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/local_psf_deconvolution_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/local_psf_padding_compare.png
 ```
 
 ## Derotation
@@ -261,7 +261,7 @@ PYTHONPATH=src python tests/visual/verify_aia_derotate.py --overwrite
 Output:
 
 ```text
-data/test/processed/observations/sdo/aia/193/derotate_20241008T231006_to_230006.fits
+cases/20241008/products/processed/observations/2300_2400/sdo/aia/193/derotate_20241008T231006_to_230006.fits
 ```
 
 Batch-process the local test AIA dataset:
@@ -285,8 +285,8 @@ frame of each wavelength as the reference submap, derotates every frame to that
 reference, and saves FITS files under:
 
 ```text
-data/test/processed/observations/20241008_2300_2400/sdo/aia/<wavelength>/prep_psf_derotate_submap/
-data/test/processed/observations/20241008_2300_2400/sdo/aia/<wavelength>/prep_psf_derotate_submap_pixel/
+cases/20241008/products/processed/observations/2300_2400/sdo/aia/<wavelength>/prep_psf_derotate_submap/
+cases/20241008/products/processed/observations/2300_2400/sdo/aia/<wavelength>/prep_psf_derotate_submap_pixel/
 ```
 
 The current processed test database contains 49 FITS files, all with shape
@@ -350,7 +350,7 @@ Sharpened quicklooks are written under `single_sharpen/` or
 This writes 49 single-frame PNGs and 7 wavelength sequence PNGs under:
 
 ```text
-data/test/figures/observations/20241008_2300_2400/sdo/aia/processed/
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/processed/
 ```
 
 Create movies from quicklook PNG frames:
@@ -394,8 +394,8 @@ PYTHONPATH=src python workflows/observations/plot_processed_hmi45_submaps.py --m
 Outputs:
 
 ```text
-data/test/processed/observations/20241008_2300_2400/sdo/hmi_45s/los_derotate_submap_pixel/
-data/test/figures/observations/20241008_2300_2400/sdo/hmi_45s/los_derotate_submap_pixel/
+cases/20241008/products/processed/observations/2300_2400/sdo/hmi_45s/los_derotate_submap_pixel/
+cases/20241008/products/figures/observations/2300_2400/sdo/hmi_45s/los_derotate_submap_pixel/
 ```
 
 The current test output contains 7 FITS files with shape `(695, 1390)`,
@@ -423,7 +423,7 @@ Benchmark script/output:
 
 ```text
 tests/visual/benchmark_derotation_methods.py
-data/test/processed/benchmarks/derotation_methods.txt
+data/benchmarks/derotation_methods.txt
 ```
 
 ## Sharpening
@@ -459,20 +459,20 @@ deconvolution. The visual smoke test is:
 ```bash
 PYTHONPATH=src python tests/visual/verify_aia_sharpen.py
 PYTHONPATH=src python tests/visual/verify_aia_sharpen.py --multiscale \
-  --output data/test/figures/observations/sdo/aia/193/multiscale_sharpen_compare.png
+  --output cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/multiscale_sharpen_compare.png
 ```
 
 Output:
 
 ```text
-data/test/figures/observations/sdo/aia/193/sharpen_compare.png
-data/test/figures/observations/sdo/aia/193/multiscale_sharpen_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/sharpen_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/multiscale_sharpen_compare.png
 ```
 
 ## Validation
 
 The maintained `aia_prep` was compared against
-`/Users/xiaoxingyun/Desktop/20241008/cme/193.ipynb`:
+`/path/to/193.ipynb`:
 
 ```text
 update_pointing -> aiapy.psf.deconvolve -> register
@@ -488,7 +488,7 @@ max_abs_difference = 0
 Comparison figure:
 
 ```text
-data/test/figures/observations/sdo/aia/193/notebook_flow_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/notebook_flow_compare.png
 ```
 
 ## Notes

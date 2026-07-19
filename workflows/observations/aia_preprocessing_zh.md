@@ -47,7 +47,7 @@ pip install -e ".[aia,solar-orbiter,test]"
 AIA PSF 是全日面的 `4096 x 4096` 数组，重复计算比较慢，所以测试流程已经把常用 EUV 波段缓存到本地：
 
 ```text
-data/test/calibration/sdo/aia/psf/
+data/calibration/sdo/aia/psf/
 ├── aia_0094_psf.npz
 ├── aia_0131_psf.npz
 ├── aia_0171_psf.npz
@@ -140,7 +140,7 @@ from aiapy.calibrate.utils import get_pointing_table
 
 from solarutils.obs.maps import aia_prep, aia_psf_path
 
-files = sorted(Path("data/test/observations/20241008_2300_2400/sdo/aia").glob("*193*.fits"))
+files = sorted(Path("cases/20241008/data/2300_2400/sdo/aia").glob("*193*.fits"))
 first_map = Map(files[0])
 pointing_table = get_pointing_table(
     "JSOC",
@@ -244,7 +244,7 @@ tests/visual/compare_aia193_local_psf_padding.py
 测试图：
 
 ```text
-data/test/figures/observations/sdo/aia/193/local_psf_padding_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/local_psf_padding_compare.png
 ```
 
 ## 8. 时间序列 derotation
@@ -310,7 +310,7 @@ PYTHONPATH=src python tests/visual/verify_aia_derotate.py --overwrite
 验证输出：
 
 ```text
-data/test/processed/observations/sdo/aia/193/derotate_20241008T231006_to_230006.fits
+cases/20241008/products/processed/observations/2300_2400/sdo/aia/193/derotate_20241008T231006_to_230006.fits
 ```
 
 本次 case 验证结果：
@@ -342,8 +342,8 @@ PYTHONPATH=src python workflows/observations/process_aia_prep_derotate_submaps.p
 
 默认处理：
 
-- 输入：`data/test/observations/20241008_2300_2400/sdo/aia/`
-- 输出：`data/test/processed/observations/20241008_2300_2400/sdo/aia/`
+- 输入：`cases/20241008/data/2300_2400/sdo/aia/`
+- 输出：`cases/20241008/products/processed/observations/2300_2400/sdo/aia/`
 - 波段：94, 131, 171, 193, 211, 304, 335 Å。
 - 每个波段第一张作为参考。
 - 每张图先执行 `aia_prep(deconvolve_psf=True)`，再裁剪/derotate 到参考 submap。
@@ -353,7 +353,7 @@ PYTHONPATH=src python workflows/observations/process_aia_prep_derotate_submaps.p
 当前测试数据库已经生成：
 
 ```text
-data/test/processed/observations/20241008_2300_2400/sdo/aia/
+cases/20241008/products/processed/observations/2300_2400/sdo/aia/
 ├── 0094/prep_psf_derotate_submap/
 ├── 0131/prep_psf_derotate_submap/
 ├── 0171/prep_psf_derotate_submap/
@@ -366,7 +366,7 @@ data/test/processed/observations/20241008_2300_2400/sdo/aia/
 如果使用 `--method pixel`，输出目录为：
 
 ```text
-data/test/processed/observations/20241008_2300_2400/sdo/aia/<wavelength>/prep_psf_derotate_submap_pixel/
+cases/20241008/products/processed/observations/2300_2400/sdo/aia/<wavelength>/prep_psf_derotate_submap_pixel/
 ```
 
 验证结果：
@@ -440,14 +440,14 @@ PYTHONPATH=src python workflows/observations/plot_processed_aia_submaps.py \
 锐化版本会保存到独立目录，避免覆盖未锐化版本：
 
 ```text
-data/test/figures/observations/20241008_2300_2400/sdo/aia/processed/single_sharpen/
-data/test/figures/observations/20241008_2300_2400/sdo/aia/processed/multiscale_sharpen/
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/processed/single_sharpen/
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/processed/multiscale_sharpen/
 ```
 
 输出：
 
 ```text
-data/test/figures/observations/20241008_2300_2400/sdo/aia/processed/
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/processed/
 ```
 
 当前已生成：
@@ -468,7 +468,7 @@ percentiles: 1, 99.5
 当前已额外生成多尺度锐化 quicklook：
 
 ```text
-data/test/figures/observations/20241008_2300_2400/sdo/aia/processed/multiscale_sharpen/
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/processed/multiscale_sharpen/
 single_png: 49
 sequence_png: 7
 ```
@@ -502,19 +502,19 @@ from solarutils.plotting import make_movie_from_images
 当前已生成 7 个多尺度锐化 MP4：
 
 ```text
-data/test/movies/observations/20241008_2300_2400/sdo/aia/
+cases/20241008/products/movies/observations/2300_2400/sdo/aia/
 ```
 
 示例：
 
 ```text
-data/test/movies/observations/20241008_2300_2400/sdo/aia/0193/0193_prep_psf_derotate_submap_multiscale_sharpen.mp4
+cases/20241008/products/movies/observations/2300_2400/sdo/aia/0193/0193_prep_psf_derotate_submap_multiscale_sharpen.mp4
 ```
 
 其中每个波段都有一张时间序列总览图，例如：
 
 ```text
-data/test/figures/observations/20241008_2300_2400/sdo/aia/processed/0193/0193_prep_psf_derotate_submap_sequence.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/processed/0193/0193_prep_psf_derotate_submap_sequence.png
 ```
 
 ## 9. 锐化
@@ -558,14 +558,14 @@ weights = (0.8, 0.35, 0.15)
 ```bash
 PYTHONPATH=src python tests/visual/verify_aia_sharpen.py
 PYTHONPATH=src python tests/visual/verify_aia_sharpen.py --multiscale \
-  --output data/test/figures/observations/sdo/aia/193/multiscale_sharpen_compare.png
+  --output cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/multiscale_sharpen_compare.png
 ```
 
 验证图：
 
 ```text
-data/test/figures/observations/sdo/aia/193/sharpen_compare.png
-data/test/figures/observations/sdo/aia/193/multiscale_sharpen_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/sharpen_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/multiscale_sharpen_compare.png
 ```
 
 单尺度运行结果示例：
@@ -609,13 +609,13 @@ PYTHONPATH=src python workflows/observations/process_hmi45_derotate_submaps.py -
 默认输入：
 
 ```text
-data/test/observations/20241008_2300_2400/sdo/hmi_45s/
+cases/20241008/data/2300_2400/sdo/hmi_45s/
 ```
 
 默认输出：
 
 ```text
-data/test/processed/observations/20241008_2300_2400/sdo/hmi_45s/los_derotate_submap_pixel/
+cases/20241008/products/processed/observations/2300_2400/sdo/hmi_45s/los_derotate_submap_pixel/
 ```
 
 默认 submap 范围：
@@ -658,7 +658,7 @@ aia193 pixel  best=0.635687 s  mean=0.673612 s
 
 ```text
 tests/visual/benchmark_derotation_methods.py
-data/test/processed/benchmarks/derotation_methods.txt
+data/benchmarks/derotation_methods.txt
 ```
 
 绘制 HMI 45s quicklook：
@@ -670,7 +670,7 @@ PYTHONPATH=src python workflows/observations/plot_processed_hmi45_submaps.py --m
 默认使用对称显示范围 `vmax=800 G`。pixel 方法输出图：
 
 ```text
-data/test/figures/observations/20241008_2300_2400/sdo/hmi_45s/los_derotate_submap_pixel/
+cases/20241008/products/figures/observations/2300_2400/sdo/hmi_45s/los_derotate_submap_pixel/
 ```
 
 当前已生成：
@@ -698,7 +698,7 @@ max_abs_diff=2127.91 G
 对比图：
 
 ```text
-data/test/figures/observations/20241008_2300_2400/sdo/hmi_45s/compare_derotation_center_pixel.png
+cases/20241008/products/figures/observations/2300_2400/sdo/hmi_45s/compare_derotation_center_pixel.png
 ```
 
 ## 11. 与旧 notebook 的验证
@@ -706,7 +706,7 @@ data/test/figures/observations/20241008_2300_2400/sdo/hmi_45s/compare_derotation
 已经和旧 notebook 对比过：
 
 ```text
-/Users/xiaoxingyun/Desktop/20241008/cme/193.ipynb
+/path/to/193.ipynb
 ```
 
 旧流程核心为：
@@ -732,7 +732,7 @@ tests/visual/compare_aia193_notebook_flow.py
 对比图：
 
 ```text
-data/test/figures/observations/sdo/aia/193/notebook_flow_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/notebook_flow_compare.png
 ```
 
 ## 12. 相关文件
@@ -765,11 +765,11 @@ workflows/observations/plot_processed_hmi45_submaps.py
 输出图片：
 
 ```text
-data/test/figures/observations/sdo/aia/171/preprocess_register_smoke.png
-data/test/figures/observations/sdo/aia/171/preprocess_psf_register_submap.png
-data/test/figures/observations/sdo/aia/193/notebook_flow_compare.png
-data/test/figures/observations/sdo/aia/193/local_psf_deconvolution_compare.png
-data/test/figures/observations/sdo/aia/193/local_psf_padding_compare.png
-data/test/figures/observations/sdo/aia/193/sharpen_compare.png
-data/test/figures/observations/sdo/aia/193/multiscale_sharpen_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/171/preprocess_register_smoke.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/171/preprocess_psf_register_submap.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/notebook_flow_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/local_psf_deconvolution_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/local_psf_padding_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/sharpen_compare.png
+cases/20241008/products/figures/observations/2300_2400/sdo/aia/193/multiscale_sharpen_compare.png
 ```

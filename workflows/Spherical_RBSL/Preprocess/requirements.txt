@@ -1,0 +1,8 @@
+numpy
+scipy
+matplotlib
+astropy
+sunpy[map]
+plotly
+pyevtk
+opencv-python

@@ -12,14 +12,14 @@ from solarutils.obs.maps import derotate_to_reference, get_submap
 
 
 DEFAULT_REFERENCE = Path(
-    "data/test/observations/20241008_2300_2400/sdo/aia/"
+    "cases/20241008/data/2300_2400/sdo/aia/"
     "aia.lev1_euv_12s.2024-10-08T230006Z.193.image_lev1.fits"
 )
 DEFAULT_INPUT = Path(
-    "data/test/observations/20241008_2300_2400/sdo/aia/"
+    "cases/20241008/data/2300_2400/sdo/aia/"
     "aia.lev1_euv_12s.2024-10-08T231006Z.193.image_lev1.fits"
 )
-DEFAULT_OUTPUT = Path("data/test/processed/observations/sdo/aia/193/derotate_20241008T231006_to_230006.fits")
+DEFAULT_OUTPUT = Path("cases/20241008/products/processed/observations/2300_2400/sdo/aia/193/derotate_20241008T231006_to_230006.fits")
 DEFAULT_EXTENT = (100.0, 800.0, 150.0, 500.0)
 
 

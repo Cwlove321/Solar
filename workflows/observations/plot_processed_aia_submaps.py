@@ -15,8 +15,8 @@ from solarutils.obs.maps import multiscale_sharpen_map, sharpen_map
 from solarutils.plotting import plot_aia_map
 
 
-DEFAULT_INPUT_DIR = Path("data/test/processed/observations/20241008_2300_2400/sdo/aia")
-DEFAULT_OUTPUT_DIR = Path("data/test/figures/observations/20241008_2300_2400/sdo/aia/processed")
+DEFAULT_INPUT_DIR = Path("cases/20241008/products/processed/observations/2300_2400/sdo/aia")
+DEFAULT_OUTPUT_DIR = Path("cases/20241008/products/figures/observations/2300_2400/sdo/aia/processed")
 
 
 def main() -> None:

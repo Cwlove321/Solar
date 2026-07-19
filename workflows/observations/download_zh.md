@@ -45,13 +45,13 @@ data/raw/
 用于测试代码正确性的少量数据建议放在：
 
 ```text
-data/test/observations/<case_name>/
+cases/<YYYYMMDD>/data/<time_range>/
 ```
 
 例如这次已经下载好的测试数据：
 
 ```text
-data/test/observations/20241008_2300_2400/
+cases/20241008/data/2300_2400/
 ```
 
 ## 3. 基本命令格式
@@ -90,7 +90,7 @@ python workflows/observations/download_observations.py sdo-aia \
   --email your_jsoc_email@example.com \
   --wavelengths 94 131 171 193 211 304 335 \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/sdo/aia \
+  --out cases/20241008/data/2300_2400/sdo/aia \
   --fetch
 ```
 
@@ -111,7 +111,7 @@ python workflows/observations/download_observations.py hmi \
   --email your_jsoc_email@example.com \
   --series hmi_m_45s \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_45s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_45s \
   --fetch
 ```
 
@@ -124,7 +124,7 @@ python workflows/observations/download_observations.py hmi \
   --email your_jsoc_email@example.com \
   --series hmi_m_720s \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_720s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_720s \
   --fetch
 ```
 
@@ -147,7 +147,7 @@ python workflows/observations/download_observations.py sharp \
   --harpnum 12001 \
   --sample-minutes 10 \
   --segments Br Bp Bt bitmap conf_disambig \
-  --out data/test/observations/20241008_2300_2400/sdo/sharp_harp12001 \
+  --out cases/20241008/data/2300_2400/sdo/sharp_harp12001 \
   --fetch
 ```
 
@@ -195,7 +195,7 @@ python workflows/observations/download_observations.py hmi-vector \
   --end 2024-10-09T00:00:00 \
   --email your_jsoc_email@example.com \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_b_720s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_b_720s \
   --fetch
 ```
 
@@ -209,7 +209,7 @@ python workflows/observations/download_observations.py hmi \
   --series hmi_b_720s \
   --segments field inclination azimuth disambig \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_b_720s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_b_720s \
   --fetch
 ```
 
@@ -229,7 +229,7 @@ python workflows/observations/download_observations.py hmi-synoptic \
   --start 2024-10-08T11:50:00 \
   --end 2024-10-08T12:10:00 \
   --email your_jsoc_email@example.com \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_mrdailysynframe_polfil_720s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_mrdailysynframe_polfil_720s \
   --fetch
 ```
 
@@ -248,7 +248,7 @@ hmi.synoptic_mr_polfil_720s.2289.Mr_polfil
 python workflows/observations/download_observations.py hmi-synoptic-cr \
   --car-rotation 2289 \
   --email your_jsoc_email@example.com \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_synoptic_mr_polfil_720s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_synoptic_mr_polfil_720s \
   --fetch
 ```
 
@@ -258,7 +258,7 @@ python workflows/observations/download_observations.py hmi-synoptic-cr \
 python workflows/observations/download_observations.py hmi-synoptic-cr \
   --time 2024-10-08T12:00:00 \
   --email your_jsoc_email@example.com \
-  --out data/test/observations/20241008_2300_2400/sdo/hmi_synoptic_mr_polfil_720s \
+  --out cases/20241008/data/2300_2400/sdo/hmi_synoptic_mr_polfil_720s \
   --fetch
 ```
 
@@ -274,7 +274,7 @@ python workflows/observations/download_observations.py stereo-a \
   --detector EUVI \
   --wavelength 195 \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/stereo_a/euvi_195 \
+  --out cases/20241008/data/2300_2400/stereo_a/euvi_195 \
   --fetch
 ```
 
@@ -297,7 +297,7 @@ python workflows/observations/download_observations.py solar-orbiter \
   --level L2 \
   --product eui-fsi174-image \
   --sample-minutes 10 \
-  --out data/test/observations/20241008_2300_2400/solar_orbiter/eui_fsi174 \
+  --out cases/20241008/data/2300_2400/solar_orbiter/eui_fsi174 \
   --fetch
 ```
 
@@ -305,7 +305,7 @@ python workflows/observations/download_observations.py solar-orbiter \
 
 - `--product eui-fsi174-image` 是 SOAR 中的 EUI FSI 174 图像产品。
 - SOAR 不支持 Fido 原生的 `Sample` 查询约束，所以本工具会先查询完整结果，再在 Python 中按 `--sample-minutes` 抽样。
-- 如果 Python 下载失败，可以从 Solar Orbiter Archive 网站手动下载，并按同样目录结构放入 `data/raw/solar_orbiter/` 或 `data/test/observations/`。
+- 如果 Python 下载失败，可以从 Solar Orbiter Archive 网站手动下载，并按同样目录结构放入 `cases/<YYYYMMDD>/data/<time_range>/solar_orbiter/` 或 `cases/<YYYYMMDD>/data/`。
 
 ## 11. 校验下载的数据
 
@@ -313,7 +313,7 @@ python workflows/observations/download_observations.py solar-orbiter \
 
 ```bash
 python workflows/observations/validate_downloads.py \
-  data/test/observations/20241008_2300_2400/sdo/aia \
+  cases/20241008/data/2300_2400/sdo/aia \
   --max-files 4 \
   --sunpy-map
 ```
@@ -322,12 +322,12 @@ HMI、STEREO-A、Solar Orbiter 也可以用同一个校验脚本：
 
 ```bash
 python workflows/observations/validate_downloads.py \
-  data/test/observations/20241008_2300_2400/stereo_a/euvi_195 \
+  cases/20241008/data/2300_2400/stereo_a/euvi_195 \
   --max-files 2 \
   --sunpy-map
 
 python workflows/observations/validate_downloads.py \
-  data/test/observations/20241008_2300_2400/solar_orbiter/eui_fsi174 \
+  cases/20241008/data/2300_2400/solar_orbiter/eui_fsi174 \
   --max-files 2 \
   --sunpy-map
 ```
@@ -336,7 +336,7 @@ SHARP CEA 文件也可以先用 Astropy 打开：
 
 ```bash
 python workflows/observations/validate_downloads.py \
-  data/test/observations/20241008_2300_2400/sdo/sharp_harp12001 \
+  cases/20241008/data/2300_2400/sdo/sharp_harp12001 \
   --max-files 5
 ```
 
@@ -345,7 +345,7 @@ python workflows/observations/validate_downloads.py \
 目前已经下载好的测试数据位于：
 
 ```text
-data/test/observations/20241008_2300_2400/
+cases/20241008/data/2300_2400/
 ```
 
 内容包括：

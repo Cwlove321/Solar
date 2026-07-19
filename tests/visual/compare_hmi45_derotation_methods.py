@@ -14,15 +14,15 @@ from solarutils.plotting import plot_hmi_los
 
 
 DEFAULT_CENTER = Path(
-    "data/test/processed/observations/20241008_2300_2400/sdo/hmi_45s/"
+    "cases/20241008/products/processed/observations/2300_2400/sdo/hmi_45s/"
     "los_derotate_submap_center/20241008_235915_to_20241008_230045.hmi45_los_derotate_submap_center.fits"
 )
 DEFAULT_PIXEL = Path(
-    "data/test/processed/observations/20241008_2300_2400/sdo/hmi_45s/"
+    "cases/20241008/products/processed/observations/2300_2400/sdo/hmi_45s/"
     "los_derotate_submap_pixel/20241008_235915_to_20241008_230045.hmi45_los_derotate_submap_pixel.fits"
 )
 DEFAULT_OUTPUT = Path(
-    "data/test/figures/observations/20241008_2300_2400/sdo/hmi_45s/"
+    "cases/20241008/products/figures/observations/2300_2400/sdo/hmi_45s/"
     "compare_derotation_center_pixel.png"
 )
 

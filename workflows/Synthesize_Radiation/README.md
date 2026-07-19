@@ -11,15 +11,22 @@
 | `synthesize_radiation.py` | 批量处理多个 AMRVAC 快照，支持光学薄合成和带吸收的 DDA 合成。 |
 | `synthesize_aia_optically_thick.py` | 对单个 AMRVAC 快照进行 AIA 171/211/304 光学厚辐射传输计算。 |
 
-两个脚本均依赖仓库内的辐射合成工具目录，其中应包含 `RST_cart/` 和
-`AIA_response/`。脚本会根据自身位置自动定位仓库根目录，默认使用：
+两个脚本均依赖原作者的 `radsyn_tools`：
+<https://github.com/fuwentai/radsyn_tools>。本仓库不上传 `Packages/`，
+首次使用时在仓库根目录执行：
+
+```bash
+bash bootstrap_dependencies.sh
+```
+
+拉取后目录中应包含 `RST_cart/` 和 `AIA_response/`，默认使用：
 
 ```text
 Packages/radsyn_tools/DDA_method1
 ```
 
-因此整个 `solar_code` 移动到其他机器或其他用户目录后，不需要修改代码中的
-绝对路径。需要使用另一份辐射合成工具时，仍可通过 `--dda-root` 覆盖默认目录。
+整个 `solar_code` 移动到其他机器后不需要修改绝对路径。需要使用另一份辐射合成工具时，
+仍可通过 `--dda-root` 覆盖默认目录。
 
 ## 批量辐射合成
 

@@ -4,9 +4,9 @@
 程序的输入，并计算总磁能、自由磁能、相对磁螺度 `H_V`、电流承载磁螺度 `H_J`
 和底边界无符号磁通量。
 
-项目使用仓库内的新版 `simesh`，没有个人 Python 包路径。保留
-`workflows/Helicity` 和 `Packages/simesh` 的相对目录关系后，可以复制到其他电脑
-或服务器安装运行。
+项目使用原作者维护的新版 `simesh`：
+<https://github.com/Astery0502/simesh>。`Packages/` 不上传到本仓库，
+安装脚本会在本地缺失时自动拉取到 `Packages/simesh`。
 
 ## 目录结构
 
@@ -34,15 +34,15 @@ solar_code/
 
 ## 最快使用方法
 
-在新的 Linux 服务器上复制 `workflows/Helicity` 和 `Packages` 后：
+在新的 Linux 服务器上克隆本仓库后：
 
 ```bash
 cd /path/to/solar_code
 bash workflows/Helicity/install.sh
 ```
 
-安装脚本会在 `workflows/Helicity/.venv` 创建独立 Python 环境，安装依赖，并以
-editable 方式安装 `Packages/simesh`。安装完成后先加载服务器的 Intel/MKL 环境，
+安装脚本会在缺失时克隆原作者 `simesh`，然后在 `workflows/Helicity/.venv`
+创建独立 Python 环境并以 editable 方式安装。安装完成后先加载服务器的 Intel/MKL 环境，
 再编译 Fortran：
 
 ```bash
@@ -98,6 +98,7 @@ bash workflows/Helicity/install.sh
 也可以手动安装：
 
 ```bash
+git clone https://github.com/Astery0502/simesh.git Packages/simesh
 python3 -m venv workflows/Helicity/.venv
 workflows/Helicity/.venv/bin/python -m pip install \
   -r workflows/Helicity/requirements.txt

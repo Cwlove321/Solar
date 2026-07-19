@@ -75,7 +75,12 @@ def configure_radsyn_tools(dda_root: str | Path) -> Path:
     global RADSYN_ROOT, DDA, physical_module
     RADSYN_ROOT = Path(dda_root).expanduser().resolve()
     if not (RADSYN_ROOT / "RST_cart").exists():
-        raise FileNotFoundError(f"RST_cart not found under --dda-root: {RADSYN_ROOT}")
+        raise FileNotFoundError(
+            f"RST_cart not found under --dda-root: {RADSYN_ROOT}\n"
+            "Run 'bash bootstrap_dependencies.sh' from the solar_code root, or clone "
+            "https://github.com/fuwentai/radsyn_tools and pass its DDA_method1 directory "
+            "with --dda-root."
+        )
     if str(RADSYN_ROOT) not in sys.path:
         sys.path.insert(0, str(RADSYN_ROOT))
     import RST_cart.DDA as dda_module

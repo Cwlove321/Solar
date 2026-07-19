@@ -25,6 +25,7 @@ env/
 # Local case studies and scientific data are never uploaded.
 cases/
 data/
+Packages/
 tmp/
 *.fits
 *.fts
@@ -50,7 +51,3 @@ src/solarutils/amrvac/**/output.*
 *.png
 *.pdf
 *.eps
-
-# Small response tables are source data required by the vendored radiation tools.
-!Packages/radsyn_tools/DDA_method1/AIA_response/*.npz
-!Packages/radsyn_tools/DDA_method2/AIA_response/*.npz

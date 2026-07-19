@@ -5,11 +5,12 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repository_root=$(cd "${script_dir}/../.." && pwd)
 python_bin=${PYTHON_BIN:-python3}
 venv_dir=${VENV_DIR:-"${script_dir}/.venv"}
+simesh_dir=${SIMESH_DIR:-"${repository_root}/Packages/simesh"}
 
-if [[ ! -d "${repository_root}/Packages/simesh" ]]; then
-    echo "错误：找不到 ${repository_root}/Packages/simesh。" >&2
-    echo "请保持 workflows/Helicity 与 Packages/simesh 的目录结构后再安装。" >&2
-    exit 1
+if [[ ! -d "${simesh_dir}" ]]; then
+    echo "未找到 simesh，从原作者仓库拉取到：${simesh_dir}"
+    mkdir -p "$(dirname "${simesh_dir}")"
+    git clone https://github.com/Astery0502/simesh.git "${simesh_dir}"
 fi
 
 echo "[1/3] 创建 Python 环境：${venv_dir}"
@@ -19,7 +20,7 @@ venv_python="${venv_dir}/bin/python"
 echo "[2/3] 安装 Python 依赖和仓库内新版 simesh"
 "$venv_python" -m pip install --upgrade pip setuptools wheel
 "$venv_python" -m pip install -r "${script_dir}/requirements.txt"
-"$venv_python" -m pip install -e "${repository_root}/Packages/simesh"
+"$venv_python" -m pip install -e "${simesh_dir}"
 
 echo "[3/3] 验证公开 Python API"
 "$venv_python" -c "from simesh.amrvac import open_dataset, read_uniform; print('simesh.amrvac: OK')"

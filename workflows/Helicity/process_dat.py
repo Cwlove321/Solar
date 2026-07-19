@@ -11,8 +11,8 @@ from types import SimpleNamespace
 import numpy as np
 
 
-# 优先使用 solar_code/Packages 中随项目分发的新版 simesh。安装后运行时，
-# 下面的路径注入也不会改变 API，只是让本工作流可以在源码目录中直接执行。
+# 优先使用从原作者仓库拉取到 solar_code/Packages 的新版 simesh。
+# 安装后运行时，下面的路径注入也不会改变 API。
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 LOCAL_SIMESH_SRC = REPOSITORY_ROOT / "Packages" / "simesh" / "src"
 if LOCAL_SIMESH_SRC.is_dir():
@@ -23,7 +23,9 @@ try:
 except (ImportError, ModuleNotFoundError) as exc:  # pragma: no cover - 环境错误提示
     raise ModuleNotFoundError(
         "无法导入新版 simesh。请在 solar_code 根目录执行：\n"
-        "  python3 -m pip install -e Packages/simesh"
+        "  bash bootstrap_dependencies.sh\n"
+        "  python3 -m pip install -e Packages/simesh\n"
+        "原作者仓库：https://github.com/Astery0502/simesh"
     ) from exc
 
 

@@ -16,4 +16,5 @@ Repeatable analysis workflows belong here. A workflow should combine reusable fu
 - `Synthesize_Radiation/`: Synthetic-radiation workflows for Cartesian AMRVAC
   snapshots, including optically thin and optically thick AIA synthesis.
 - `Helicity/`: Cartesian AMRVAC magnetic-energy and relative-helicity workflow,
-  including uniform-grid preprocessing with the bundled new `Packages/simesh`.
+  including uniform-grid preprocessing with the upstream `simesh` cloned into
+  the local, Git-ignored `Packages/simesh` directory.

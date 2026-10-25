@@ -74,7 +74,7 @@ python Preprocess/prepare_rbsl_boundary.py \
   --lon-range 13 61 --lat-range 8 32 \
   --resolution-degree 0.1 \
   --nghost 2 --refine-level 1 \
-  --nr 400 --length-r 0.8
+  --nr 400 --domain-nr 72 --inner-radius 1.0 --length-r 0.5
 ```
 
 ### 磁场预处理默认值

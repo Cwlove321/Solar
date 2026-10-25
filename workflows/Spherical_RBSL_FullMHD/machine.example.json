@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "amrvac_dir": "vendor/amrvac",
+  "arch": "default",
+  "make_jobs": 4,
+  "module_setup": [],
+  "environment": {},
+  "library_dirs": ["/path/to/compiled-pdfi-fishpack-cfitsio/lib"],
+  "libraries": ["pdfi_ss", "fishpack", "cfitsio"],
+  "stage_libraries": {},
+  "compiler_commands": ["mpif90"],
+  "launcher": ["mpirun", "-np", "{ranks}"],
+  "ranks": {
+    "01_pfss": 1,
+    "01_pfss_global_ct": 1,
+    "02_relax": 1,
+    "03_insert": 1,
+    "04_fullmhd": 1
+  },
+  "scheduler": {"kind": "local"},
+  "executable": "./amrvac",
+  "make_command": "make",
+  "setup_command": null
+}

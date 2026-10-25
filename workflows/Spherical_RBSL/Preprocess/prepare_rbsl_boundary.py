@@ -192,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
         nr=args.nr,
         length_r=args.length_r,
         refine_level=args.refine_level,
+        inner_radius=args.inner_radius,
+        domain_nr=args.domain_nr,
     )
     parameters = {
         "pfss_mod_usr.t": mod_usr,
@@ -246,6 +248,8 @@ def parse_args(argv: list[str] | None = None):
         help="Base ghost-cell count; effective width is nghost*2**(refine_level-1), matching IDL dixB.",
     )
     parser.add_argument("--nr", type=int, default=400)
+    parser.add_argument("--domain-nr", type=int, help="Radial base-grid cell count written as domain_nx1.")
+    parser.add_argument("--inner-radius", type=float, default=1.0)
     parser.add_argument("--length-r", type=float, default=0.8)
     parser.add_argument("--refine-level", type=int, default=1)
     parser.add_argument("--b-scale", type=float, default=1.0)

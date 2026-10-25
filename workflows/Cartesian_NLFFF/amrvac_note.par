@@ -2,6 +2,8 @@
 !$AMRVAC_DIR/setup.pl -d=3                         ! 三维笛卡尔问题的 AMRVAC 预处理命令
 
  &filelist
+        ! NLFFF fresh-start snapshot index: restart decrements 1 to 0.
+        snapshotnext=1
         base_filename='data/nlfff'                 ! NLFFF 输出前缀：data/nlfffNNNN.dat/.vtu
         saveprim=.true.                             ! 输出原始（primitive）变量
         autoconvert=.true.                          ! 每次 DAT 输出后自动转换为 VTU
@@ -10,12 +12,11 @@
         restart_from_file='potential/data/lfff0000.dat' ! NLFFF 初态：势场阶段的 DAT 输出
  /                                                  ! filelist 结束
         restart_from_file='potential/data/lfff0000.dat' ! 历史重复写法；应保留 namelist 内的同名参数
-        snapshotnext=1                              ! 历史快照起始编号设置；新算例建议在 filelist 内显式设置
         convert=.true.                              ! 历史转换开关；命令行 -convert 时由 AMRVAC 控制
 
  &savelist
-        itsave(1,1)=0                               ! 不按迭代步数触发第 1 类输出
-        itsave(1,2)=0                               ! 不按迭代步数触发第 2 类输出
+        itsave(1,1)=0                               ! 第0步保存日志
+        itsave(1,2)=0                               ! 第0步保存DAT；与 snapshotnext=1 配合
         ditsave_log=1                               ! 每 1 个迭代步记录一次 log
  /                                                  ! savelist 结束
         dtsave_dat=2.d0                             ! 历史 DAT 时间间隔；新值应写入 savelist 内
@@ -83,6 +84,7 @@
  /
 
  &mf_list
+        mf_it=0  ! Start a new relaxation; set the actual MF step when resuming.
         mf_it_max=60000                             ! 磁摩擦松弛允许的最大迭代步数
         mf_ditsave=20000                            ! 每 20000 个磁摩擦步保存一次诊断
         mf_cc=0.5                                   ! 磁摩擦速度/时间步控制系数 cc

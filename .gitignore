@@ -25,7 +25,18 @@ env/
 # Local case studies and scientific data are never uploaded.
 cases/
 data/
-Packages/
+Packages/*
+!Packages/README.md
+!Packages/dependencies.lock.json
+!Packages/qsl/
+!Packages/qsl/**
+!Packages/radsyn_tools/
+!Packages/radsyn_tools/**
+!Packages/simesh/
+!Packages/simesh/**
+Packages/qsl/src/qsl/bin/
+Packages/simesh/src/simesh.egg-info/
+Packages/simesh/src/simesh/utils/lib/amr/*.c
 tmp/
 *.fits
 *.fts
@@ -51,3 +62,6 @@ src/solarutils/amrvac/**/output.*
 *.png
 *.pdf
 *.eps
+
+# Vendored radsyn calibration tables are scientific source data, not case output.
+!Packages/radsyn_tools/**/AIA_response/*.npz

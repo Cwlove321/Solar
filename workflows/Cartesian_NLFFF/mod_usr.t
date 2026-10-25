@@ -26,7 +26,25 @@ contains
 
     call set_coordinate_system("Cartesian_3D")
     call mhd_activate()
+    ! Install after mhd_activate, which registers the original MF hook.
+    if (mhd_magnetofriction) usr_before_main_loop => start_nlfff_relaxation
   end subroutine usr_init
+
+  ! Synchronize restart state before MF chooses collective initial output.
+  ! Keep this wrapper in the workflow so shared AMRVAC builds need no patch.
+  subroutine start_nlfff_relaxation()
+    use mod_global_parameters, only: snapshotini, snapshotnext, icomm, ierrmpi, MPI_INTEGER
+    use mod_magnetofriction, only: magnetofriction
+    use mod_comm_lib, only: mpistop
+
+    call MPI_BCAST(snapshotini,1,MPI_INTEGER,0,icomm,ierrmpi)
+    if (snapshotnext < 0) then
+      call mpistop('NLFFF negative output index: '// &
+                   'set snapshotnext=1 in &filelist for a fresh restart')
+      return
+    end if
+    call magnetofriction()
+  end subroutine start_nlfff_relaxation
 
   !==============================================================================
   ! Purpose: to initialize user public parameters and reset global parameters.

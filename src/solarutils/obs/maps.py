@@ -360,6 +360,116 @@ def derotate_to_reference_pixel(
     return Map(data, meta)
 
 
+def align_map_sequence_by_content(
+    maps,
+    *,
+    reference_index: int = 0,
+    upsample_factor: int = 20,
+    region: tuple[slice, slice] | None = None,
+    order: int = 1,
+    mode: str = "nearest",
+    cval: float = 0.0,
+):
+    """Remove residual frame-to-frame shifts from an already aligned Map sequence.
+
+    This is a supplementary *image-content* registration step for time-series
+    visualization.  Apply it only after the physical AIA workflow
+    (:func:`aia_prep` and, when applicable, :func:`derotate_to_reference`).
+    It compensates small residual pointing discontinuities that remain in the
+    pixel data; it does not replace WCS pointing correction or solar derotation.
+
+    Parameters
+    ----------
+    maps
+        Ordered SunPy maps with identical data shapes.  Consecutive maps are
+        registered with phase correlation.
+    reference_index
+        Frame left fixed in the returned coordinate system.
+    upsample_factor
+        Phase-correlation upsampling factor.  Larger values give finer
+        subpixel shifts at greater computational cost.
+    region
+        Optional ``(y_slice, x_slice)`` used only to measure shifts.  Select a
+        stable area when a flare or other rapidly evolving bright structure
+        would otherwise dominate the full-frame correlation.  The calculated
+        shifts are still applied to the complete maps.
+    order, mode, cval
+        Parameters passed to :func:`scipy.ndimage.shift` while resampling each
+        map.
+
+    Returns
+    -------
+    tuple[list[~sunpy.map.GenericMap], numpy.ndarray]
+        Corrected maps and the applied ``(dy, dx)`` shifts in pixels.  The
+        shift for ``reference_index`` is exactly zero.
+
+    Notes
+    -----
+    Install ``solarutils[registration]`` to use this optional feature.
+    """
+
+    sequence = list(maps)
+    if not sequence:
+        raise ValueError("maps must contain at least one map")
+    if not 0 <= reference_index < len(sequence):
+        raise IndexError("reference_index is outside the map sequence")
+    if upsample_factor < 1:
+        raise ValueError("upsample_factor must be at least 1")
+
+    shape = np.shape(sequence[0].data)
+    if any(np.shape(smap.data) != shape for smap in sequence):
+        raise ValueError("all maps must have identical data shapes")
+
+    correlation_data = [_phase_correlation_data(smap.data) for smap in sequence]
+    if region is not None:
+        if len(region) != 2 or any(not isinstance(part, slice) for part in region):
+            raise TypeError("region must be a (y_slice, x_slice) pair")
+        if correlation_data[0][region].size == 0:
+            raise ValueError("region must select at least one pixel")
+
+    try:
+        from skimage.registration import phase_cross_correlation
+    except ImportError as exc:
+        raise ImportError(
+            "content registration requires scikit-image; install solarutils[registration]"
+        ) from exc
+
+    cumulative_shifts = np.zeros((len(sequence), 2), dtype=float)
+    for index in range(1, len(sequence)):
+        previous = correlation_data[index - 1] if region is None else correlation_data[index - 1][region]
+        current = correlation_data[index] if region is None else correlation_data[index][region]
+        shift_yx, _, _ = phase_cross_correlation(
+            previous, current, upsample_factor=upsample_factor
+        )
+        cumulative_shifts[index] = cumulative_shifts[index - 1] + shift_yx
+
+    applied_shifts = cumulative_shifts - cumulative_shifts[reference_index]
+    corrected = []
+    for smap, shift_yx in zip(sequence, applied_shifts):
+        data = ndimage.shift(
+            np.asarray(smap.data),
+            shift=tuple(shift_yx),
+            order=order,
+            mode=mode,
+            cval=cval,
+            prefilter=order > 1,
+        )
+        corrected.append(Map(data, smap.meta.copy()))
+    return corrected, applied_shifts
+
+
+def _phase_correlation_data(data):
+    """Return a finite float array suitable for phase correlation."""
+
+    values = np.asarray(data, dtype=float)
+    finite = np.isfinite(values)
+    if not np.any(finite):
+        raise ValueError("each map must contain at least one finite data value")
+    if np.all(finite):
+        return values
+    return np.where(finite, values, np.median(values[finite]))
+
+
 def _derotated_reference_meta(
     reference_map,
     source_map,

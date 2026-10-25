@@ -161,7 +161,8 @@ def hmi_native_vector_components(field, inclination, azimuth):
 
     The convention follows the SHARP/JSOC vector-field azimuth basis: `+xi`
     is CCD +x, `+eta` is CCD +y, and `+zeta` is out of the image plane /
-    line-of-sight.
+    line-of-sight.  HMI azimuth is measured counterclockwise from `+eta`, so
+    `Bxi=-B sin(gamma) sin(psi)` and `Beta=B sin(gamma) cos(psi)`.
     """
 
     field = np.asarray(field, dtype=float)
@@ -172,8 +173,8 @@ def hmi_native_vector_components(field, inclination, azimuth):
 
     gamma = np.radians(inclination)
     psi = np.radians(azimuth)
-    bxi = field * np.sin(gamma) * np.sin(psi)
-    beta = -field * np.sin(gamma) * np.cos(psi)
+    bxi = -field * np.sin(gamma) * np.sin(psi)
+    beta = field * np.sin(gamma) * np.cos(psi)
     bzeta = field * np.cos(gamma)
     return bxi, beta, bzeta
 

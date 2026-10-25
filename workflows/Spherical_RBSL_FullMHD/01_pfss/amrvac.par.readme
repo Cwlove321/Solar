@@ -1,0 +1,184 @@
+# 01_pfss/amrvac.par 参数说明
+
+对应文件：[amrvac.par](amrvac.par)。核对日期：2026-10-22。本文按原文件顺序逐项解释全部 **88 项赋值**；数组赋值为一项，数组元素含义在该项内说明。
+
+对应 `.par` 的 SHA256：`cb1ee56c079d457af8cae99f6bc5a0b4e44ca1102171d1c8ae470303dfbcab8f`。配置改变后应同步本说明；本文件不会被AMRVAC读取。
+
+## 当前阶段与生效状态
+
+- 局部 PDFI_SS/FISHPACK 势场初始化：先从观测底面 Br 扣除目标 RBSL 的 Br，再生成背景场；本阶段不把日冕磁绳叠加回去。
+- time_max=0，只构造并保存初态，不推进正时间 MHD。热传导/TRAC 虽配置为开启，但此阶段没有有限时长的热演化。
+- autoconvert=true：初态 DAT 同时转换为 VTU；本文件没有 dtsave_dat，不应给它虚构周期输出间隔。
+
+## 单位、语法与读取注意
+
+- `unit_length=6.955e10 cm=695.5 Mm`，`unit_numberdensity=1e9 cm^-3`，`unit_temperature=1e6 K`；时间单位约`5.97e3 s`，准确换算以本次启动日志的`unit_time`为准。代码质量密度、热压分别乘`unit_density`、`unit_pressure`。
+- `*_Mm`、`*_K`、`*_cgs`及明确给定物理单位的自定义参数已经是物理值；不要再按代码长度/温度重复换算。`mhd_reduced_c`当前输入为CGS速度，是特别容易误读的一项。
+- 径向坐标是距球心半径；当前r为1–1.5，离底面高度0–347.75 Mm。`.par`角坐标用“整周=1”，当前余纬57.6°–86.4°、经度166.2°–223.8°；余纬不是纬度。
+- `d0`/`d-3`是Fortran双精度指数；`.true.`/`.false.`是布尔量；`20*'hll'`或`20*1.d0`表示数组重复20次，并非数值乘20或启用20层网格。
+- DAT保存求解器状态；当前`mhd_internal_e=true`时e是内能，不要再次扣除磁能/动能。`saveprim`作用于转换输出，不改变DAT变量含义；半相对论动量恢复速度也应匹配实际求解器。
+- 路径以启动时工作目录为准。未写出的核心参数使用所选编译源码默认值；本文不把未出现的参数虚构成显式设置。MPI核数由job/mpirun配置，不由`max_blocks`或`.par`内某个核数参数决定。
+
+## 逐项说明
+
+### &atmosphere_list — 初始大气与底边界
+
+大气表在启动时重建，并用于底边界；普通restart不会用它覆盖DAT内部的密度、压力、温度。切换模型或归一化时必须避免“内部旧大气、底边界新大气”。
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `atmosphere_model` | `'analytic_tr'` | 初始和底边界的一维径向静力大气温度剖面：analytic_tr 为低层 tanh 过渡区与上层恒定导热通量解析剖面拼接；isothermal 为整张初始/边界大气表恒温。随后积分 dp/dr=-rho GM/r² 构造压力和密度。<br>单位：字符串：analytic_tr 或 isothermal。 | 这不是时间演化中的恒温开关；isothermal 不会关闭 MHD 能量方程。mhd_energy=true 时建表。重启保留 DAT 内部状态，但仍会重建底边界大气，必须与来源初态一致。 |
+| `atmosphere_normalization` | `'number_density'` | 静力大气密度/压力共同缩放的锚定方式：number_density 在指定参考高度固定 n_H；pressure 在同一参考高度固定气压。两者均用空间线性插值求锚点，缩放不改变温度剖面。<br>单位：字符串：number_density 或 pressure。 | 只使用选中方式对应的目标值；不是同时强制密度和压力。当前默认 number_density 对应成功 RBSL15；pressure 不等于恢复旧代码的错误插值。 |
+| `atmosphere_reference_height_Mm` | `10.d0` | 大气归一化参考高度，相对模型底面；在此处把 n_H 或气压固定为所选目标。<br>单位：Mm。 | 必须位于包含 ghost 区的一维大气表覆盖范围内。当前 10 Mm 配合 number_density，而 pressure 模式也使用这一高度，不会自动改用底部。 |
+| `atmosphere_reference_nH_cgs` | `6.2d8` | number_density 归一化时参考高度处的氢数密度 n_H；代码用 n_H/unit_numberdensity 作为无量纲密度锚点。<br>单位：cm^-3。 | 不是质量密度 g cm^-3，也不是电子数密度。pressure 模式下不参与缩放，但仍须是有限正数以通过检查。 |
+| `atmosphere_reference_pressure_cgs` | `138.365d0` | pressure 归一化时参考高度处的气体热压目标。<br>单位：erg cm^-3，等价 dyn cm^-2。 | 当前采用number_density，此压力锚点闲置。number_density 模式下不参与缩放；138.365 不是当前密度归一化下实际参考压力的声明。切换 pressure 前须同时核对参考高度和值。 |
+| `atmosphere_chromosphere_K` | `8000.d0` | analytic_tr 低温支 tanh 曲线的低温渐近值 T_chromosphere。<br>单位：K。 | 要求 0 < T_chromosphere < T_transition < T_tanh_top。实际最低表温是 floor_height 处 tanh 的值，不严格等于渐近值；isothermal 时不用于剖面。 |
+| `atmosphere_tanh_top_K` | `1.5d6` | analytic_tr 的低层 tanh 分支高温渐近参数，用于确定 tanh 形状和拼接偏移。<br>单位：K。 | 不是计算域顶端温度、不是日冕全域恒定温度；上层实际温度由导热通量公式计算。仅 analytic_tr 使用。 |
+| `atmosphere_transition_height_Mm` | `2.d0` | analytic_tr 低层 tanh 与上层导热通量温度支的连接高度 h_tr；该处温度为 atmosphere_transition_K。<br>单位：Mm，相对底面。 | 因代码平移 tanh 以满足指定连接温度，此高度不是未平移 tanh 的中心。floor_height 必须小于它。 |
+| `atmosphere_transition_width_Mm` | `0.25d0` | analytic_tr 中 tanh 自变量的长度尺度 w_tr，控制过渡区温度变化的陡峭程度。<br>单位：Mm。 | 必须为正；不是过渡区完整几何厚度或 AMR 网格宽度。isothermal 下不参与剖面，但仍通过参数检查。 |
+| `atmosphere_transition_K` | `1.6d5` | analytic_tr 在 h_tr 连接处的温度 T_tr，同时作为上层导热通量解析式的温度锚点。<br>单位：K。 | 须严格位于 chromosphere_K 和 tanh_top_K 之间；不是辐射冷却截止温度。 |
+| `atmosphere_conductive_flux_cgs` | `2.d5` | 构造 analytic_tr 上层静力大气温度曲线的恒定导热通量幅值 F_c；T(h)=[T_tr^(7/2)+(7/2)F_c(h-h_tr)/kappa_0]^(2/7)，物理单位下 kappa_0=8e-7。<br>单位：erg cm^-2 s^-1。 | 要求非负；这是初始/底边界大气表的构造参数，不是运行中强制处处保持的热通量，也不自动开启 mhd_thermal_conduction。仅 analytic_tr 使用。 |
+| `atmosphere_floor_height_Mm` | `-0.2d0` | analytic_tr 低层温度向下延拓的冻结高度；低于此高度，温度取该高度的 tanh 值，避免继续下降。<br>单位：Mm，相对底面，可为负。 | 是温度剖面的高度阈值，不是 small_temperature 或密度下限；必须低于 transition_height。主要影响低层/ghost 区。 |
+| `atmosphere_isothermal_K` | `1.d6` | 选择 isothermal 时整张初始/底边界静力大气表的恒定温度。密度仍随重力作静力分层。<br>单位：K。 | 当前采用analytic_tr，此恒温参数闲置。仅 isothermal 用于剖面；analytic_tr 模式下闲置但仍要求有限且为正。不会强迫后续三维演化恒温。 |
+
+### &filelist — 文件输入输出
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `base_filename` | `'./data/pfss_'` | 输出文件的路径和名称前缀；快照通常在前缀后追加四位编号及扩展名。<br>单位：路径字符串。 | 相对路径以启动程序的工作目录为准，不以 .par 所在位置为准；它不是输入 DAT 路径。 |
+| `saveprim` | `.true.` | 在转换后的可视化输出中使用原始量，如速度和热压，而非动量等演化变量。<br>单位：逻辑值。 | 不把原生 DAT 改成原始量文件；DAT 仍直接保存求解器状态，本工作流能量槽是内能。不能因此把 DAT 的动量当作速度或把能量当压力。 |
+| `autoconvert` | `.true.` | 每次正常快照输出时，除 DAT 外同时按 convert_type 生成可视化文件。<br>单位：逻辑值。 | false 只关闭在线转换，不关闭 DAT；以后仍可单独转换，true 会增加计算与 I/O 开销。 |
+| `nwauxio` | `12` | 转换输出附加的用户诊断变量数量，由 usr_aux_output 计算、usr_add_aux_names 命名。<br>单位：变量个数。 | 不是方程数量，也不是 DAT 中额外演化的变量。必须与 specialvar_output 写入的 nw+1…nw+12 和名称列表匹配，不能随意减小。 |
+| `convert_type` | `'vtuBmpi'` | 可视化转换格式；vtuBmpi 指二进制 VTK UnstructuredGrid，支持 MPI 转换，变量插值到单元角点。<br>单位：格式字符串。 | vtuBmpi 与保存单元中心量的 vtuBCCmpi 不同；角点插值可能平滑或改变局部极值。只有 autoconvert 或单独 convert 时才使用。 |
+
+### &savelist — 保存调度
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `ditsave_log` | `1` | 每经过指定数量的积分步输出一次日志诊断。<br>单位：迭代步。 | 与代码时间间隔不同；步长变化时对应的物理时间间隔也变化。 |
+| `itsave(1,1)` | `0` | 第一条按迭代号指定的日志输出事件；第二索引 1 表示日志。<br>单位：迭代号。 | 设为 0 表示在第 0 步记录日志；重启若不归零迭代号，不等于每次重启都会触发。 |
+| `itsave(1,2)` | `0` | 第一条按迭代号指定的正常快照事件；第二索引 2 表示 DAT 快照。<br>单位：迭代号。 | 设为 0 可保存积分前的第 0 步状态；不是单独的 VTU 调度，VTU 由 autoconvert 控制。 |
+| `itsave(1,5)` | `0` | 第一条按迭代号指定的用户自定义分析事件；第二索引 5 调用 usr_write_analysis。<br>单位：迭代号。 | 不是第五种磁场输出、不是 VTU。本工作流未注册 usr_write_analysis，因此这项通常不额外生成文件。 |
+
+### &stoplist — 终止条件与时间重置
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `dtmin` | `1.d-8` | 允许的最小积分时间步；检测到候选 dt 低于此值时停止。<br>单位：代码时间。 | 是失稳/步长塌缩保护阈值，不是强行把 dt 提高到该值；不能用调低它来证明不稳定已修复。 |
+| `time_max` | `0.d0` | 模拟代码时间的结束上限。<br>单位：代码时间。 | 与 it_max、wall_time_max 等条件任一先达到就停止；是否承接 DAT 的绝对时间由 reset_time 决定。设为 0 的初始化阶段不进行正时间演化。 |
+| `wall_time_max` | `48.d0` | 程序内部的实际运行时长上限。<br>单位：小时。 | 不是物理模拟时间，也不替代调度器队列的墙钟限制；程序会为后续一步和输出预留余量而提前退出。 |
+
+### &methodlist — 数值方法与小值处理
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `time_stepper` | `'threestep'` | 双曲演化的时间推进阶段数/方法族；threestep 在未指定 time_integrator 时选 SSPRK3。<br>单位：方法字符串。 | 三子步不等于只跑三步；热传导 STS 和分裂源项另有自己的推进设置。 |
+| `flux_scheme` | `20*'hll'` | 逐 AMR 层级选择计算单元界面通量的数值格式；hll 为 HLL 近似 Riemann 求解器。<br>单位：每层一个字符串。 | 20*'hll' 是 Fortran 重复赋值，表示 20 个层级槽位都填 hll，不表示启用 20 层；实际层数由 refine_max_level 限定。 |
+| `limiter` | `20*'cada3'` | 逐 AMR 层级选择重建到界面的斜率限制器；vanleer 与 cada3 是不同重建方案。<br>单位：每层一个字符串。 | 限制器影响精度、耗散与尖锐梯度稳健性；20* 的 20 仍是数组重复次数，不是实际 AMR 层数。 |
+| `small_density` | `1.d-3` | 密度的小值/正性处理阈值。<br>单位：代码质量密度；物理值为数值×unit_density。 | 不是初始背景密度。fix_small_values 和 small_values_method 决定遇到低于阈值状态时的处理；replace 会改变状态与守恒预算。 |
+| `small_pressure` | `1.d-3` | 热压的小值/正性处理阈值。<br>单位：代码热压；物理值为数值×unit_pressure。 | 不是温度下限，也不是内能的同一数值；内能与压力通过 gamma−1 换算。若另设正的 small_temperature，核心代码会重算本阈值。 |
+| `fix_small_values` | `.true.` | 允许物理模块在变量转换及相关源项操作中处理非物理小值。<br>单位：逻辑值。 | 处理办法由 small_values_method 决定；开启不意味着所有 NaN、Inf 或各子步都已获得可靠保护，仍需检查实际补丁及日志。 |
+| `small_values_method` | `'replace'` | 发现非物理小值后的策略：error 报错，replace 使用阈值替换，average 用周围有效状态平均。<br>单位：策略字符串。 | replace 是数值修复而非物理加热/加载；会调整相关变量，动量处理应以实际 MHD 模块和 small_values_fix_iw 为准，不保证守恒。 |
+
+### &boundlist — 边界条件
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `typeboundary_min1` | `8*'special'` | r 方向内边界（光球底边界）的逐变量边界类型；special 调用用户边界。<br>单位：变量类型数组。 | 当前用户实现将鬼单元动量置零，rho、p 取静力大气表 rbc/pbc；CT 切向面磁场单边外推、法向面磁场由离散散度约束补齐。8* 只是为 8 个 MHD 变量重复赋值；物理边界磁场演化还受电场回调约束。 |
+| `typeboundary_max1` | `8*'special'` | r 方向外边界（计算域顶部）的逐变量边界类型；special 调用用户边界。<br>单位：变量类型数组。 | 当前保持 r²rho、r*vtheta、r*vphi 沿径向外推连续，vr 只准非负流出，p/rho（温度）连续；CT 切向面场外推、法向场用散度约束补齐。这不是所有变量简单零梯度。 |
+| `typeboundary_min2` | `8*'special'` | 余纬 theta 最小端（更靠北一侧）的逐变量边界类型。<br>单位：变量类型数组。 | 当前 special 分支将鬼单元全部动量置零、密度和热压按内部值镜像填充；CT 切向面场单边外推、法向场用散度约束补齐。不是周期边界，也不是保留切向速度的标准反射墙。 |
+| `typeboundary_max2` | `8*'special'` | 余纬 theta 最大端（更靠南一侧）的逐变量边界类型。<br>单位：变量类型数组。 | 当前 special 分支将鬼单元全部动量置零、密度和热压按内部值镜像填充；CT 切向面场单边外推、法向场用散度约束补齐。不是周期边界。 |
+| `typeboundary_min3` | `8*'special'` | 经度 phi 最小端的逐变量边界类型。<br>单位：变量类型数组。 | 当前 special 分支将鬼单元全部动量置零、密度和热压按内部值镜像填充；CT 切向面场单边外推、法向场用散度约束补齐。经度两端不周期相接。 |
+| `typeboundary_max3` | `8*'special'` | 经度 phi 最大端的逐变量边界类型。<br>单位：变量类型数组。 | 当前 special 分支将鬼单元全部动量置零、密度和热压按内部值镜像填充；CT 切向面场单边外推、法向场用散度约束补齐。经度两端不周期相接。 |
+
+### &meshlist — 计算域、网格与 AMR
+
+当前itfixgrid=0，从演化开始冻结已有树；ditregrid=3不会使其动态重网格。固定树不等于所有叶块均处于L4。用户回调强制底边界最高层，但不包含历史RBSL15的强盒子/故障区L4盒。
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `refine_criterion` | `3` | 自动加密误差估计器；当前值 3 选择 Löhner 型归一化梯度/曲率误差估计。<br>单位：整数选项。 | 随后还执行用户强制细化回调。官方文字页与某些核心版本的打印标签有编号差异；当前 3 的含义已由 mod_errest 的执行支路核验，不能据打印标签猜其他编号。 |
+| `refine_max_level` | `4` | 允许的最高 AMR 层，包含作为 L1 的根网格。<br>单位：层级整数。 | 不是全域都处于最高层；每增加一层每方向分成两份。伸长网格中子单元并非一定是物理长度完全相等的两半。 |
+| `refine_threshold` | `0.2d0, 0.4d0, 0.6d0, 0.8d0, 16*0.2d0` | 各 AMR 层的误差阈值数组；超过相应阈值的区域请求细化。<br>单位：无量纲误差阈值，每层一个。 | 不是密度数值阈值。本工作流 specialthreshold 会在侧面/顶部附近提高局部容许误差，special_refine_grid 另外强制保留底边界最高层；冻结树后不再动态执行。 |
+| `derefine_ratio` | `20*1.d0` | 粗化误差阈值相对于细化阈值的比例；粗化判定使用 derefine_ratio×相应层的 refine_threshold。<br>单位：无量纲比例，每层一个。 | 不是网格尺寸的粗化倍数。等于 1 意味着不留阈值迟滞间隔，不能读成禁止粗化；最终仍受树相容性、用户强制细化和 itfixgrid 限制。 |
+| `w_refine_weight(1)` | `1.d0` | 第一个状态变量（本 MHD 模块为密度）在自动误差估计中的权重。<br>单位：无量纲权重。 | 本文件只设置第一项为 1、其他项默认 0，自动误差估计因此只跟踪密度；所有权重应合计为 1。用户指定的底边界强制细化不受此权重选择限制。 |
+| `block_nx1` | `12` | 每个 AMR 块内沿 r 的有效单元数，不含鬼单元。<br>单位：单元数。 | 各层块的单元数相同、覆盖空间尺度不同；须与 domain_nx1 整除关系及核心偶数等约束相容。 |
+| `block_nx2` | `12` | 每个 AMR 块内沿 theta 的有效单元数，不含鬼单元。<br>单位：单元数。 | 各层块的单元数相同；须与 domain_nx2 整除关系及核心偶数等约束相容。 |
+| `block_nx3` | `12` | 每个 AMR 块内沿 phi 的有效单元数，不含鬼单元。<br>单位：单元数。 | 各层块的单元数相同；须与 domain_nx3 整除关系及核心偶数等约束相容。 |
+| `domain_nx1` | `72` | 根网格 L1 覆盖整个径向域的有效单元数。<br>单位：单元数。 | 不是最终全部 AMR 叶单元数；须为 block_nx1 的整数倍。径向伸长开启时单元宽度不均匀。 |
+| `domain_nx2` | `36` | 根网格 L1 覆盖整个余纬域的有效单元数。<br>单位：单元数。 | 须为 block_nx2 的整数倍；局部细化会提高对应区域分辨率。 |
+| `domain_nx3` | `72` | 根网格 L1 覆盖整个经度域的有效单元数。<br>单位：单元数。 | 须为 block_nx3 的整数倍；局部细化会提高对应区域分辨率。 |
+| `xprobmin1` | `1.d0` | 计算域内径 r_min，以球心为原点。<br>单位：代码长度，本工作流为 R_sun=6.955e10 cm。 | 不是离光球的高度；当前 r_min=1 时 h=(r−1)×695.5 Mm。更改计算域必须同步背景场、路径和边界数据。 |
+| `xprobmax1` | `1.5d0` | 计算域外径 r_max，以球心为原点。<br>单位：代码长度，本工作流为 R_sun。 | 不是高度本身；高度需减去参考光球半径。重启时必须与 DAT 网格及背景输入一致。 |
+| `xprobmin2` | `0.16d0` | 计算域余纬 theta 的最小值；余纬从北极向南增加。<br>单位：2π 为 1 的角度单位，即数值×360°。 | .par 中不是弧度，也不是纬度；代码读入后乘 2π。纬度=90°−theta。 |
+| `xprobmax2` | `0.24d0` | 计算域余纬 theta 的最大值。<br>单位：2π 为 1 的角度单位，即数值×360°。 | .par 中不是弧度；转换成纬度时纬度=90°−theta，因此 theta_max 对应更南端。 |
+| `xprobmin3` | `0.46166666666666667d0` | 计算域经度 phi 的最小值。<br>单位：2π 为 1 的角度单位，即数值×360°。 | .par 中不是度数或弧度；须与 path.dat、PFSS/磁图的同一经度约定一致。 |
+| `xprobmax3` | `0.62166666666666667d0` | 计算域经度 phi 的最大值。<br>单位：2π 为 1 的角度单位，即数值×360°。 | 改变角域不等于旋转或重映射已有 DAT；必须同步网格、路径和磁边界。 |
+| `stretch_dim(1)` | `'uni'` | 径向网格伸长类型；uni 为单向几何伸长，none 为不伸长，symm 为对称伸长。<br>单位：类型字符串。 | uni 不是 uniform 均匀网格；本配置 q>1 时沿 r 向外单元逐渐变宽。后处理必须使用原 .par 的伸长映射重建真实坐标。 |
+| `qstretch_baselevel(1)` | `1.041541581503301d0` | L1 径向相邻单元宽度的比值 q=Δr_(i+1)/Δr_i。<br>单位：无量纲比例。 | 不是相邻径向坐标比，也不是块宽比。L层使用 q_L=q_1^(1/2^(L−1))；首单元宽度由总域宽和几何级数确定。更改 q 会改变所有径向节点，不能忽略它读取 DAT。 |
+| `ditregrid` | `3` | 动态 AMR 重新评估和重建树的积分步间隔。<br>单位：迭代步。 | 只有树未被冻结时才执行；itfixgrid=0 会让演化期间的动态重网格关闭，即使本项为 3 也不是每 3 步重网格。 |
+| `itfixgrid` | `0` | 达到此迭代号起冻结 AMR 层级树。<br>单位：迭代号。 | 0 表示从演化开始固定现有树，不表示关闭此限制；它不取消新算例初始化阶段的建树，亦不禁止现有固定树上的 MHD 推进。 |
+| `max_blocks` | `40000` | 每个 MPI 进程允许分配的网格块数量上限。<br>单位：块/进程。 | 不是全局叶块总数，也不是MPI核数；加大此值会增加部分索引/树数组内存开销，但不会直接提高空间分辨率。 |
+| `iprob` | `1` | 用户代码的算例分支编号；本工作流 1 用于 PFSS 矢势构造，2 用于 RBSL 矢势及重启插绳分支。<br>单位：整数编号。 | 不是通用物理开关。必须结合 firstprocess、restart_from_file 和当前阶段源码理解；普通续算 firstprocess=false 不会仅因 iprob=1 就重新覆盖内部磁场。 |
+
+### &paramlist — CFL 时间步
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `typecourant` | `'maxsum'` | 多维 CFL 约束的组合方式；maxsum 先对同一单元各方向 cmax/Δs 求和，再取空间最大值，dt_CFL=CFL/max_cells(sum_d(cmax_d/Δs_d))。<br>单位：方法字符串。 | 球坐标/伸长网格使用真实物理路径长度 Δs（含球面度量），不能把角度差直接当长度；全局 dt 还可能受其他物理、源项、输出和终止时刻约束。 |
+| `courantpar` | `0.8d0` | CFL 数，即传播稳定性时间步前的无量纲安全系数。<br>单位：无量纲。 | 并非固定时间步；在状态和网格相同时减小它通常降低 CFL 上限，但实际 dt 可能由别的限制决定。较大 CFL 不等价于更准确或必然稳定。 |
+
+### &mhd_list — MHD 物理模块
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `mhd_energy` | `.true.` | 是否求解能量方程；true 表示热力学状态随能量演化，并允许热传导、辐射等能量源项。能量变量具体是总能量还是内能由 mhd_internal_e 等开关决定。<br>单位：逻辑值。 | 本工作流采用 true；不能把它解释成‘必定求解总能量’。改为 false 会切换为多方/等温闭合，且当前用户源项和初态链路未作为该分支的完整方案验证。 |
+| `mhd_gravity` | `.true.` | 启用重力源项；本工作流由 usr_gravity 回调给出球坐标径向太阳引力，角向分量为零。<br>单位：逻辑值；回调内部加速度为代码单位。 | 只控制演化中的重力，不会自动替换或重新平衡所读入 DAT 的大气。具体径向函数在本阶段 mod_usr.t 的 getggrav/gravity 中。 |
+| `typedivbfix` | `'ct'` | 磁场无散条件的数值处理方法；ct 为约束输运，使用网格面上的磁场与边上的电场更新磁通，保持离散磁场散度。<br>单位：字符串枚举。 | 本工作流的磁场初始化、插绳和底边界均按 CT 面心磁场设计，不能只替换此字符串就改用另一种方法；CT 不等于把任意错误初场自动清成无散。 |
+| `mhd_thermal_conduction` | `.true.` | 启用抛物型热传导能量项；MHD 中以沿磁场方向导热为主，垂直分量及饱和限制由 tc_list 控制，时间推进由 STS 加速。<br>单位：逻辑值。 | 需要能量方程。关闭时 tc_list 中的传导设置不产生传导更新；开启并不表示恒温或已经达到热平衡。 |
+| `mhd_radiative_cooling` | `.false.` | 光学薄辐射冷却主开关；开启后按所选冷却曲线向能量方程加入局部损失，形式为 −n_e n_H Λ(T)。<br>单位：逻辑值。 | false 时即使写了 rc_list，也不会施加该辐射项；与后处理辐射合成、背景加热开关相互独立，不包含光子的非局地输运和吸收反馈。 |
+| `mhd_semirelativistic` | `.true.` | 启用半相对论 MHD 修正，借助约化光速减弱极低密度、强磁场区过大的 Alfvén 特征速度限制。<br>单位：逻辑值。 | 不是完整相对论 MHD。与 mhd_internal_e=true 联用时走近似分裂半相对论分支；约化光速应足够高，避免改变关心的动力学。 |
+| `mhd_reduced_c` | `6.d8` | 半相对论修正使用的约化光速；当前 6.d8 为 6×10^8 cm/s，即 6000 km/s。<br>单位：本工作流 CGS 下输入 cm/s，不是通常的代码速度。 | 仅 mhd_semirelativistic=true 时使用。官方源码对此大于 1 的输入通过 (unit_velocity/mhd_reduced_c)^2 转成代码系数；小于 1 的输入有另一个无量纲分支，因此不要把普通代码速度数值直接填入而不核对版本。 |
+| `mhd_internal_e` | `.true.` | 以热内能方程代替总能量方程；无额外状态方程修正时气压 p=(γ−1)e_int，避免从大总能量中减去磁能和动能所产生的严重相消误差。<br>单位：逻辑值。 | 不是同时演化两套能量并自动切换的 dual-energy 开关。需要 mhd_energy=true；内部 DAT 的 e 是内能，不能再次扣除磁能和动能来计算温度。 |
+| `mhd_trac` | `.true.` | 开启 TRAC 过渡区自适应导热修正，以数值拓宽未充分分辨的过渡区，并协调导热及适用的热源/辐射项，减轻低分辨率导致的蒸发通量偏差。<br>单位：逻辑值。 | 不是网格 AMR 开关，也不是温度地板。TRAC 的局部 Tcoff 与辐射适用下限 tcool_cutoff 是不同量；它不会自行开启已关闭的热传导、辐射或背景加热。 |
+| `mhd_trac_type` | `2` | 选择 TRAC 算法；2 为局部 LTRAC 方法（源码标注 Iijima 等 2021），由温度梯度与网格尺度在局部计算展宽修正，不需要沿完整磁力线全局追踪。<br>单位：整数枚举。 | 只有 mhd_trac=true 才生效；2 不是 AMR 的第二层，也不是二阶时间积分的编号。其他类型对几何和磁力线追踪有不同要求，不能视为任意互换。 |
+| `mhd_adiab` | `1.4d0` | 不求解能量方程时，多方关系 p=Kρ^γ 中的系数 K；γ=1 时对应等温闭合系数。<br>单位：代码单位 p/ρ^γ。 | 当前mhd_energy=true，不采用此多方闭合。当前各文件 mhd_energy=true，因此它不决定当前大气温度，也不是‘γ=1.4’。本工作流无能量方程分支还会将它赋给 Tiso，但该分支并非当前配置。 |
+| `mhd_eta` | `2.4693930682273452d-6` | 电阻感应项的常系数，控制磁扩散与相应焦耳加热；正值使用空间常数，零关闭显式电阻，负值用于调用用户定义电阻函数。<br>单位：代码磁扩散系数；物理磁扩散率 = mhd_eta × unit_length²/unit_time，CGS 为 cm²/s。 | 不是直接以 Ω·m 或 CGS 电导倒数输入。当前为正值；usr_special_resistivity 注册被注释，不能改成负值就认为异常电阻已可用。此项还可能施加扩散稳定性时间步限制。 |
+
+### &Mag_list — 磁绳、质量加载与背景加热
+
+当前模板磁绳小半径15 Mm，不是此前成功RBSL15运行的20 Mm。磁场参数、瞬时密度加载和Liakh时间质量源是不同机制；do_rbsl=false不代表DAT内没有磁绳。
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `do_rbsl` | `.true.` | 启用目标 RBSL 轴和磁场参数的准备。在 01_pfss / 01_pfss_global_ct 新建背景时，还先从输入光球 Br 扣除该目标绳的 Br 再外推；在 03_insert 配合 restart、firstprocess=true、iprob=2 准备并叠加磁绳。<br>单位：逻辑值。 | 不是“DAT 内是否存在磁绳”的标志，也不是独立通用插入开关。实际 restart 叠加分支由 firstprocess/iprob=2 控制，不应只改此项。02/04 默认 false 是保留已存背景/磁绳、不重复构造。 |
+| `Bflux` | `1.29d20` | RBSL 磁绳轴向磁通 F；内部转为 F_flx=Bflux/(unit_magneticfield*unit_length²)，与半径一起决定代码中的电流参数。<br>单位：Mx，等价 G cm²。 | 不是磁场强度 G，也不是质量加载。当前模型 I_cur=±5√2 F_flx/(12πa0)，不是另行独立指定电流。扣除背景与插绳时必须使用相同磁通、半径、路径和方向；普通续算不会据此重缩放 DAT 内磁场。 |
+| `I_Helix` | `.false.` | 传入 RBSL_flux_rope 的 positive_helicity：true 选正螺度的电流-磁通关系，false 选负螺度；对正 Bflux 分别取正/负 I_cur。<br>单位：逻辑值。 | 控制螺度符号，不是电流数值或路径端点顺序；轴向场的空间方向还取决于 path.dat 顺序、flip_axis 和磁通符号。 |
+| `Rmfr` | `15.d0` | RBSL 磁绳小半径 a0，内部换算 a0=Rmfr*1e8/unit_length。直接密度加载的归一化横向距离也使用该半径。<br>单位：Mm。 | 不是大半径、轴高度或直径。只改续算 .par 不会改变 DAT 中已存在的绳半径；更改初态需一致地重新扣除和插入。 |
+| `npoints` | `6000` | path.dat 的观测/日冕轴采样点数 np；代码添加反向地下镜像段形成 2*np 个积分轴点。<br>单位：整数，点数。 | path.dat 必须为小端 float64 交错三元组 (经度deg, 纬度deg, 半径Rsun)，严格 24*npoints 字节；纬度不是余纬，第三列不是高度Mm。更多点会增加 RBSL 积分成本，不是 AMR 分辨率。 |
+| `flip_axis` | `.false.` | 反转输入日冕轴及其镜像闭合段的积分方向。<br>单位：逻辑值。 | 会改变轴向场/电流的空间方向和足点极性配对；不是只改变绘图顺序，也不是等价翻转 I_Helix。扣除与插绳两步须保持一致。 |
+| `weak_field` | `.false.` | 在 initvecpot_usr 返回前把其构造的矢势 A 乘 wf_scale，因而缩放此初始化分支经 curl(A) 得到的磁场。<br>单位：逻辑值。 | 不是运行中全场限幅开关。restart 的 rbsl_vectorpotential CT 叠加分支没有此乘法，也不会自动把读取 DAT 的已有磁场缩放；不能把它写成“全程把所有磁场乘 wf_scale”。 |
+| `wf_scale` | `0.d0` | weak_field=true 时 initvecpot_usr 所返回矢势的乘法缩放系数。<br>单位：无量纲。 | 当前弱场缩放关闭，0值不生效。当前 weak_field=false 时 0 值不生效；若直接打开 weak_field 而保留 0，将令相应初始化矢势为零。并非密度缩放或全域所有 restart 磁场的自动缩放。 |
+| `load_filament_density` | `.false.` | 在一次性 restart 插入分支中调用 enhance_filament_density，按到轴的距离在指定高度以上直接乘大密度。<br>单位：逻辑值。 | 须实际进入 restart + firstprocess + iprob=2 分支，并有已准备的轴数据。只改密度，不同步增加内能，因而同压下温度下降；这是瞬时加载，不是 liakh_mass_loading 时间源。02/04 普通续算 false 不会删除原有暗条物质。 |
+| `background_heating_cgs` | `0.d0` | 径向指数背景加热在底面处的幅值 H0；H(h)=H0*exp[-h/(60 Mm)]，作为体积热源加入能量。<br>单位：erg cm^-3 s^-1。 | 0 表示此背景加热关闭，不表示焦耳/压缩等其他热项全部关闭。加热与辐射开关独立；仅开加热而关辐射会改变热收支。尺度60 Mm在源码中固定，不是此参数本身。 |
+
+### &tc_list — 热传导
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `tc_perpendicular` | `.false.` | 是否加入垂直于局部磁场方向的热传导；false 保留沿场传导，不添加该垂直传导分量。<br>单位：逻辑值。 | 仅 mhd_thermal_conduction=true 时使用；false 不是把所有方向的导热关掉，热流仍可沿弯曲磁力线具有径向、纬向和经向分量。 |
+| `tc_saturate` | `.true.` | 启用热流饱和限制，避免经典导热通量在极大温度梯度下无限增大。<br>单位：逻辑值。 | 仅热传导开启时有效；不是温度上限，也不是将温度强制截断。它限制的是热量输运通量而不是气体温度。 |
+
+### &sts_list — 超时间推进
+
+| 参数 | 当前值 | 含义与单位 | 生效条件及注意事项 |
+| --- | --- | --- | --- |
+| `sts_dtpar` | `0.2d0` | STS 计算显式扩散基准时间步的安全系数，参与估计完成当前宏时间步所需的超时间推进子步数；本工作流主要用于热传导。<br>单位：无量纲。 | 不是 MHD 的 courantpar，也不是输出间隔。官方实现初始化时除以 ndim，再乘各 STS 项返回的显式时间步；三维输入 0.2 对应内部乘子 0.2/3。减小通常增加子步工作量，不能简单说全局 dt 必定乘 0.2。 |
+
+## 核验依据与版本边界
+
+- 用户自定义参数、初始化和边界以本阶段的[mod_usr.t](mod_usr.t)为准；profiles使用04_fullmhd的同一用户模块。大气看`read_atmosphere_params/inithdstatic`，磁绳看`Mag_list/usr_params_read/RBSL_flux_rope`，边界看`specialbound_usr/boundary_electric_field`。
+- 核心通用项参考[AMRVAC参数文档](https://amrvac.org/md_doc_2par.html)、[输入输出源码](https://amrvac.org/mod__input__output_8t_source.html)、[时间步源码](https://amrvac.org/mod__dt_8t_source.html)、[AMR误差估计源码](https://amrvac.org/mod__errest_8t_source.html)。在线文档可能与项目版本不同，不以打印标签代替实际执行分支。
+- 热物理参考[MHD源码](https://amrvac.org/mod__mhd__phys_8t_source.html)、[热传导源码](https://amrvac.org/mod__thermal__conduction_8t_source.html)、[STS源码](https://amrvac.org/mod__supertimestepping_8t_source.html)。
+- 本次只读交叉核验了guoguo共享依赖`/share/home/guoyang1/codes/amrvac/src`：`amrvac.t:57–80`的重启/重置、`mod_global_parameters.t:405`的每进程块数、`io/mod_input_output.t:894,1549,1787,1834,2109`的积分/伸长/输出。
+- 这里描述的是当前工作流参数，不是对历史生产可执行文件、某份既有DAT或全新长期模拟稳定性的认证。

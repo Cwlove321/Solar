@@ -4,9 +4,9 @@
 程序的输入，并计算总磁能、自由磁能、相对磁螺度 `H_V`、电流承载磁螺度 `H_J`
 和底边界无符号磁通量。
 
-项目使用原作者维护的新版 `simesh`：
-<https://github.com/Astery0502/simesh>。`Packages/` 不上传到本仓库，
-安装脚本会在本地缺失时自动拉取到 `Packages/simesh`。
+项目使用仓库内锁定版本的 `Packages/simesh`，其上游为
+<https://github.com/Astery0502/simesh>。不要在运行时自动替换成上游最新版本；
+依赖版本由 `Packages/dependencies.lock.json` 记录。
 
 ## 目录结构
 
@@ -17,12 +17,15 @@ solar_code/
 └── workflows/
     └── Helicity/
         ├── process_dat.py         # 唯一 Python 预处理入口
+        ├── helicity_binary.py     # bd/nlfff 格式、校验和原子写入
         ├── run_pipeline.sh        # 单机完整流程
         ├── py_jobs.sh             # LSF 并行预处理
         ├── read_results.py        # out.binary → 屏幕/CSV
         ├── install.sh             # 服务器 Python 环境安装
         ├── Makefile               # Intel Fortran + MKL 构建
-        ├── helicity.f90           # 精简后的主程序
+        ├── helicity.f90           # 逐帧调度主程序
+        ├── helicity_io.f90        # 参数、输入检查和诊断输出
+        ├── helicity_solver.f90    # 单帧磁能与磁螺度计算
         ├── helicity_numerics.f90  # 梯度、DeVore 矢势、Poisson、积分
         ├── helicity_diagnostics.f90
         ├── requirements.txt
@@ -41,7 +44,7 @@ cd /path/to/solar_code
 bash workflows/Helicity/install.sh
 ```
 
-安装脚本会在缺失时克隆原作者 `simesh`，然后在 `workflows/Helicity/.venv`
+安装脚本会检查仓库内锁定的 `simesh`，然后在 `workflows/Helicity/.venv`
 创建独立 Python 环境并以 editable 方式安装。安装完成后先加载服务器的 Intel/MKL 环境，
 再编译 Fortran：
 
@@ -98,7 +101,7 @@ bash workflows/Helicity/install.sh
 也可以手动安装：
 
 ```bash
-git clone https://github.com/Astery0502/simesh.git Packages/simesh
+test -d Packages/simesh
 python3 -m venv workflows/Helicity/.venv
 workflows/Helicity/.venv/bin/python -m pip install \
   -r workflows/Helicity/requirements.txt
@@ -133,7 +136,7 @@ Makefile 会自动完成：
 
 1. 编译 `$MKLROOT/include/mkl_dfti.f90`；
 2. 编译 `$MKLROOT/include/mkl_poisson.f90`；
-3. 按依赖顺序编译三个 Helicity Fortran 文件；
+3. 按依赖顺序编译五个 Helicity Fortran 文件；
 4. 链接 sequential MKL，生成 `workflows/Helicity/helicity`。
 
 ### 在 guoguo 服务器生成 `.mod` 和 `.o`
@@ -180,6 +183,10 @@ build/helicity_numerics.mod
 build/helicity_numerics.o
 build/helicity_diagnostics.mod
 build/helicity_diagnostics.o
+build/helicity_io.mod
+build/helicity_io.o
+build/helicity_solver.mod
+build/helicity_solver.o
 build/helicity.o
 helicity
 ```
@@ -219,17 +226,29 @@ ifort -O3 -c helicity_diagnostics.f90 \
   -module build -Ibuild -I"$MKL_INCLUDE" \
   -o build/helicity_diagnostics.o
 
-# 5. 编译主程序
+# 5. 生成 helicity_io.mod
+ifort -O3 -c helicity_io.f90 \
+  -module build -Ibuild -I"$MKL_INCLUDE" \
+  -o build/helicity_io.o
+
+# 6. 生成 helicity_solver.mod
+ifort -O3 -c helicity_solver.f90 \
+  -module build -Ibuild -I"$MKL_INCLUDE" \
+  -o build/helicity_solver.o
+
+# 7. 编译主程序
 ifort -O3 -c helicity.f90 \
   -module build -Ibuild -I"$MKL_INCLUDE" \
   -o build/helicity.o
 
-# 6. 链接可执行文件
+# 8. 链接可执行文件
 ifort -O3 \
   build/mkl_dfti.o \
   build/mkl_poisson.o \
   build/helicity_numerics.o \
   build/helicity_diagnostics.o \
+  build/helicity_io.o \
+  build/helicity_solver.o \
   build/helicity.o \
   -L"$MKL_LIBDIR" \
   -lmkl_intel_lp64 -lmkl_sequential -lmkl_core \
@@ -412,8 +431,10 @@ bash run_pipeline.sh /data/amrvac_run /data/helicity_output 0 80 2
 -Bx(xmin), +Bx(xmax), -By(ymin), +By(ymax), -Bz(zmin), +Bz(zmax)
 ```
 
-新版 `simesh` 返回 `(x,y,z,variable)`；预处理会显式转换成 Fortran 文件接口使用的
-`(z,y,x)` 内存顺序。
+新版 `simesh` 返回 `(x,y,z,variable)`；预处理会显式转换成 Python 的 `(z,y,x)`
+C-order 数组。由于两者的最快索引都是 `x`，连续字节可直接读入 Fortran `(x,y,z)`
+数组。文件固定使用 little-endian `float64/int32`；写入采用同目录临时文件加原子替换，
+读取时会拒绝截断或带未定义尾部数据的文件。
 
 `out.binary` 默认每帧包含 5 个 `float64`：
 
@@ -441,9 +462,12 @@ divergence_error, curl_a_error
 远端已经运行过的单文件版本完整保存在 `reference/guojh/helicity.f90`。正式版本没有
 改变势场边界条件、DeVore gauge 积分、磁能/磁螺度公式和输出量，主要整理为：
 
-- `helicity.f90`：参数、I/O 和逐帧流程；
+- `helicity.f90`：只保留逐帧调度；
+- `helicity_io.f90`：参数、二进制长度校验和诊断输出；
+- `helicity_solver.f90`：势场、能量与磁螺度单帧计算；
 - `helicity_numerics.f90`：可复用数值核；
 - `helicity_diagnostics.f90`：可选误差估计；
+- `helicity_binary.py`：Python/Fortran 共享格式契约，成对生成时只校验一次；
 - 旋度计算复用两个临时三维数组，替代原来的六个，减少该步骤约 2/3 scratch 内存；
 - 每帧检查输入文件、维度和 MKL 返回状态；
 - 输入路径、编号和误差开关改为命令行参数，不再为不同任务修改源码。

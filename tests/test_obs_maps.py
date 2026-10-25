@@ -298,3 +298,55 @@ def test_derotate_to_reference_pixel_method_uses_pixel_helper(monkeypatch):
     assert len(calls) == 1
     assert calls[0][1:] == (reference_map, 3, -1.0)
     assert isinstance(calls[0][0], FakeMap)
+
+
+def test_align_map_sequence_by_content_removes_residual_pointing_jump(monkeypatch):
+    class FakeMap:
+        def __init__(self, data, meta):
+            self.data = data
+            self.meta = meta
+
+    rng = np.random.default_rng(17)
+    reference_data = rng.normal(size=(128, 128))
+    jumped_data = np.roll(reference_data, shift=(4, 1), axis=(0, 1))
+    monkeypatch.setattr(maps, "Map", FakeMap)
+
+    corrected, shifts = maps.align_map_sequence_by_content(
+        [FakeMap(jumped_data, {"id": 0}), FakeMap(reference_data, {"id": 1})],
+        reference_index=1,
+        upsample_factor=50,
+        region=(slice(8, -8), slice(8, -8)),
+    )
+
+    residual, _, _ = __import__("skimage.registration", fromlist=["phase_cross_correlation"]).phase_cross_correlation(
+        corrected[0].data[8:-8, 8:-8], corrected[1].data[8:-8, 8:-8], upsample_factor=50
+    )
+    assert np.allclose(shifts[0], (-4.0, -1.0), atol=0.1)
+    assert np.allclose(shifts[1], (0.0, 0.0))
+    assert np.linalg.norm(residual) < 0.1
+    assert corrected[1].meta == {"id": 1}
+
+
+def test_align_map_sequence_by_content_rejects_mismatched_shapes():
+    maps_in = [
+        SimpleNamespace(data=np.ones((2, 2))),
+        SimpleNamespace(data=np.ones((3, 2))),
+    ]
+
+    try:
+        maps.align_map_sequence_by_content(maps_in)
+    except ValueError as exc:
+        assert "identical data shapes" in str(exc)
+    else:
+        raise AssertionError("mismatched maps should be rejected")
+
+
+def test_align_map_sequence_by_content_rejects_empty_region():
+    maps_in = [SimpleNamespace(data=np.ones((2, 2))), SimpleNamespace(data=np.ones((2, 2)))]
+
+    try:
+        maps.align_map_sequence_by_content(maps_in, region=(slice(0, 0), slice(None)))
+    except ValueError as exc:
+        assert "at least one pixel" in str(exc)
+    else:
+        raise AssertionError("empty registration region should be rejected")

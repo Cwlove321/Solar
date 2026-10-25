@@ -1,0 +1,2 @@
+# Default installation for selecting observations and creating/running cases.
+-r requirements-preprocess.txt

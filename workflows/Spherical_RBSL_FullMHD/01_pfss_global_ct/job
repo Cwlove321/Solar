@@ -1,0 +1,35 @@
+#!/bin/bash
+#BSUB -q mpi
+#BSUB -n 640
+#BSUB -R "span[ptile=64]"
+#BSUB -J pfss_global_ct
+
+set -euo pipefail
+
+TIME_STAMP=$(date +"%Y%m%d_%H%M")
+mkdir -p ./log ./data ./python ./potential_boundary
+exec > "./log/${TIME_STAMP}.out"
+exec 2> "./log/${TIME_STAMP}.err"
+
+module load intel/oneapi_2023
+GLOBAL_FMHD_LIBDIR=${GLOBAL_FMHD_LIBDIR:-/share/home/guoyang1/apps/global_fmhd_deps/chenpf_libs}
+export LD_LIBRARY_PATH="${GLOBAL_FMHD_LIBDIR}:${LD_LIBRARY_PATH:-}"
+NPROCS=${LSB_DJOB_NUMPROC:-640}
+
+if ((NPROCS % 64 != 0)); then
+  echo "MPI rank count must be a multiple of 64: ${NPROCS}" >&2
+  exit 64
+fi
+if [[ ! -s potential_boundary/pfss_boundary.dat ]]; then
+  echo "Missing global magnetogram: potential_boundary/pfss_boundary.dat" >&2
+  exit 2
+fi
+if [[ ! -s path.dat ]]; then
+  echo "Missing RBSL axis: path.dat" >&2
+  exit 2
+fi
+
+echo "Job started at $(date), ranks=${NPROCS}"
+mpirun -np "${NPROCS}" ./amrvac -i amrvac.par
+echo "Job finished at $(date)"
+

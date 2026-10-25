@@ -215,7 +215,7 @@ def test_hmi_native_vector_components_matches_generated_sharp_comparison():
         azimuth=np.array([90.0]),
     )
 
-    assert np.allclose(bxi, [2.0])
+    assert np.allclose(bxi, [-2.0])
     assert np.allclose(beta, [0.0], atol=1e-12)
     assert np.allclose(bzeta, [0.0], atol=1e-12)
 

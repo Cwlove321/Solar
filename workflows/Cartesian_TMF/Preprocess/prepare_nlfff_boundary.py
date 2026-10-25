@@ -57,6 +57,41 @@ DEFAULT_NLFFF_PREPROCESS_MAX_ITER = 5000
 DEFAULT_NLFFF_PREPROCESS_TOL = 1.0e-4
 
 
+def validate_physical_grid(nx: int, ny: int) -> dict[str, object]:
+    """Enforce this workflow's 2/3/5-factor rule on the unpadded binned grid."""
+
+    factors = {}
+    invalid = []
+    for name, value in (("nx", nx), ("ny", ny)):
+        if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value <= 0:
+            raise ValueError(f"physical {name} must be a positive integer; got {value!r}")
+        remaining = int(value)
+        powers = {}
+        for prime in (2, 3, 5):
+            exponent = 0
+            while remaining % prime == 0:
+                remaining //= prime
+                exponent += 1
+            if exponent:
+                powers[str(prime)] = exponent
+        factors[name] = powers
+        if remaining != 1:
+            invalid.append(f"{name}={value} (remaining factor {remaining})")
+    if invalid:
+        raise ValueError(
+            "physical nx/ny after binning, excluding file ghosts, must contain only "
+            "prime factors 2, 3, 5: " + "; ".join(invalid)
+            + ". Adjust the crop before writing boundary files; e.g. 360 x 216."
+        )
+    return {
+        "passed": True,
+        "physical_shape_xy": [int(nx), int(ny)],
+        "allowed_prime_factors": [2, 3, 5],
+        "factorization": factors,
+        "excludes_file_ghosts": True,
+    }
+
+
 def write_nlfff_from_cartesian(
     output_dir: Path,
     bx: np.ndarray,
@@ -83,13 +118,18 @@ def write_nlfff_from_cartesian(
     and crops a single CEA FITS map before applying the same conventions.
     """
 
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
     reducer = multigrid_reducer(level)
     if bx.shape != by.shape or bx.shape != bz.shape:
         raise ValueError("Bx, By, and Bz must have identical shapes")
+    if bx.ndim != 2:
+        raise ValueError("Bx, By, and Bz must be two-dimensional")
+    if nghost < 0:
+        raise ValueError("nghost must be non-negative")
     if bx.shape[0] % reducer or bx.shape[1] % reducer:
         raise ValueError(f"array shape {bx.shape} is not divisible by reducer={reducer}")
+    grid_validation = validate_physical_grid(bx.shape[1] // reducer, bx.shape[0] // reducer)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
     bx, by, bz = multigrid_reduce_components(bx, by, bz, level=level)
     if preprocess:
         bx, by, bz, _ = preprocess_cartesian_field(
@@ -114,13 +154,16 @@ def write_nlfff_from_cartesian(
     )
     write_potential_boundary(output_dir / "potential_boundary.dat", bz, meta)
     write_nlfff_boundary(output_dir / "nlfff_boundary.dat", bx, by, bz, meta)
-    return {"meta": meta}
+    return {"meta": meta, "grid_validation": grid_validation}
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    reducer = multigrid_reducer(args.level)
+    grid_validation = validate_physical_window(args, reducer)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Validated physical grid {args.nx // reducer} x {args.ny // reducer}: prime factors 2/3/5.")
 
     br_path, bt_path, bp_path = resolve_component_paths(args)
     print("Loading CEA vector FITS...")
@@ -129,8 +172,6 @@ def main(argv: list[str] | None = None) -> int:
     bp, _ = read_fits_data(bp_path)
     bx, by, bz = local_cartesian_from_heliographic(br, bt, bp)
 
-    reducer = multigrid_reducer(args.level)
-    validate_physical_window(args, reducer)
     ghost_pixels = args.nghost * reducer
 
     print("Cropping potential window plus ghost pixels...")
@@ -247,6 +288,7 @@ def main(argv: list[str] | None = None) -> int:
             "note": "x/y are local CEA-plane coordinates relative to the input patch reference pixel unless overridden.",
         },
         "amrvac": meta.as_dict,
+        "grid_validation": grid_validation,
         "outputs": {
             "potential_boundary": str(output_dir / "potential_boundary.dat"),
             "nlfff_boundary": str(output_dir / "nlfff_boundary.dat"),
@@ -307,12 +349,28 @@ def parse_args(argv: list[str] | None = None):
 
 
 def validate_physical_window(args, reducer: int):
+    if args.nx <= 0 or args.ny <= 0:
+        raise ValueError("physical nx, ny before binning must be positive")
     if args.nx % reducer or args.ny % reducer:
         raise ValueError(
             f"physical nx, ny must be divisible by reducer={reducer}; got nx={args.nx}, ny={args.ny}"
         )
     if args.nghost < 0:
         raise ValueError("--nghost must be non-negative")
+    nx, ny = args.nx // reducer, args.ny // reducer
+    report = validate_physical_grid(nx, ny)
+    nz = ny if args.domain_nx3 is None else args.domain_nx3
+    if nz <= 0:
+        raise ValueError("--domain-nx3 must be positive")
+    for axis, size in enumerate((nx, ny, nz), 1):
+        block = getattr(args, f"block_nx{axis}")
+        if block is not None and (block <= 0 or block % 2 or size % block):
+            raise ValueError(
+                f"block_nx{axis}={block} must be positive, even and divide domain_nx{axis}={size}"
+            )
+    report["domain_shape_xyz"] = [nx, ny, nz]
+    report["block_shape_xyz"] = [args.block_nx1, args.block_nx2, args.block_nx3]
+    return report
 
 
 def resolve_component_paths(args):

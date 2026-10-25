@@ -13,6 +13,8 @@ OBJECTS := \
 	$(BUILD_DIR)/mkl_poisson.o \
 	$(BUILD_DIR)/helicity_numerics.o \
 	$(BUILD_DIR)/helicity_diagnostics.o \
+	$(BUILD_DIR)/helicity_io.o \
+	$(BUILD_DIR)/helicity_solver.o \
 	$(BUILD_DIR)/helicity.o
 
 .PHONY: all check-env clean
@@ -37,7 +39,13 @@ $(BUILD_DIR)/helicity_numerics.o: helicity_numerics.f90 $(BUILD_DIR)/mkl_poisson
 $(BUILD_DIR)/helicity_diagnostics.o: helicity_diagnostics.f90 $(BUILD_DIR)/helicity_numerics.o
 	$(FC) $(FFLAGS) -c $< $(MODULE_FLAGS) -o $@
 
-$(BUILD_DIR)/helicity.o: helicity.f90 $(BUILD_DIR)/helicity_diagnostics.o
+$(BUILD_DIR)/helicity_io.o: helicity_io.f90 $(BUILD_DIR)/helicity_numerics.o
+	$(FC) $(FFLAGS) -c $< $(MODULE_FLAGS) -o $@
+
+$(BUILD_DIR)/helicity_solver.o: helicity_solver.f90 $(BUILD_DIR)/helicity_diagnostics.o $(BUILD_DIR)/helicity_io.o
+	$(FC) $(FFLAGS) -c $< $(MODULE_FLAGS) -o $@
+
+$(BUILD_DIR)/helicity.o: helicity.f90 $(BUILD_DIR)/helicity_solver.o
 	$(FC) $(FFLAGS) -c $< $(MODULE_FLAGS) -o $@
 
 $(TARGET): $(OBJECTS)

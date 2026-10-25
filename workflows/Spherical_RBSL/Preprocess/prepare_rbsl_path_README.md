@@ -108,6 +108,7 @@ HMI 相关可选参数：
 - `--hmi`
 - `--hmi-vmin`
 - `--hmi-vmax`
+- `--hmi-contour-levels -30 30`：同时提供 `--aia` 和 `--hmi` 时，在交互窗口、选点结果图和轴线投影图上叠加 HMI 的 ±30 G 等高线。正值用红色实线，负值用蓝色虚线。原始 HMI 通过 Howard 较差自转对齐到 AIA 的坐标参考时刻，再一次双线性采样到 AIA 网格；不预先旋转磁图，也不额外平滑。输出 `hmi_on_aia_grid.fits`，时间、插值方式写入 `path_summary.json` 的 `hmi_contour_alignment`。该对齐不重建磁场随时间的演化，也不会把 HMI45 LOS 转换为 Br。单独使用 HMI 作为底图时仍自动旋转。
 
 提供 `--hmi` 时，脚本会在给定经纬度范围内绘制 HMI 经纬度底图；如果同时开启 `--write-3d`，也会输出 HMI 曲面上的 3D 磁绳图。
 

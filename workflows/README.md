@@ -18,3 +18,6 @@ Repeatable analysis workflows belong here. A workflow should combine reusable fu
 - `Helicity/`: Cartesian AMRVAC magnetic-energy and relative-helicity workflow,
   including uniform-grid preprocessing with the upstream `simesh` cloned into
   the local, Git-ignored `Packages/simesh` directory.
+- `Simulation_Analysis/`: Configuration-driven AMRVAC DAT inspection, spherical
+  fixed-coordinate slices, time evolution, run monitoring, extremum mapping,
+  AMR-aware energy budgets, and reusable cold/dense-structure diagnostics.

@@ -1,0 +1,7 @@
+# Optional DAT balance-current analysis and GIF support; not solver runtime.
+-r requirements-preprocess.txt
+Pillow>=10,<13
+setuptools>=68
+wheel>=0.41
+Cython>=3,<4
+# After installing these requirements, build: python -m pip install --no-build-isolation ./vendor/simesh

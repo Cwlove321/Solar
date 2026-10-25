@@ -36,6 +36,17 @@ def parse_args() -> argparse.Namespace:
         default="raw",
         help="Optional scalar transform before writing",
     )
+    parser.add_argument(
+        "--full-resolution",
+        action="store_true",
+        help="Use the unbinned projected NPY at twice the par x1/x2 resolution",
+    )
+    parser.add_argument(
+        "--grid-scale",
+        type=int,
+        default=None,
+        help="Explicit x1/x2 grid scale relative to domain_nx in the par file",
+    )
     return parser.parse_args()
 
 
@@ -63,9 +74,10 @@ def write_plane(
     date_obs: str,
     source: str,
     transform: str,
+    grid_scale: int,
 ) -> dict[str, object]:
-    nx = int(params["domain_nx1"])
-    ny = int(params["domain_nx2"])
+    nx = int(params["domain_nx1"]) * grid_scale
+    ny = int(params["domain_nx2"]) * grid_scale
     if data.shape != (ny, nx):
         raise ValueError(f"{source}: array shape {data.shape} != par grid {(ny, nx)}")
 
@@ -126,7 +138,11 @@ def main() -> None:
 
     outputs: list[dict[str, object]] = []
     for record in metadata["records"]:
-        npy = args.npy_dir / record["bin2_npy"]
+        grid_scale = args.grid_scale if args.grid_scale is not None else (2 if args.full_resolution else 1)
+        if grid_scale < 1:
+            raise ValueError("grid-scale must be at least 1")
+        npy_key = "npy" if grid_scale > 1 else "bin2_npy"
+        npy = args.npy_dir / record[npy_key]
         raw_data = np.load(npy)
         data = (
             np.log10(np.maximum(raw_data, 0.0) + 1.0).astype(np.float32)
@@ -136,7 +152,12 @@ def main() -> None:
         wavelength = int(record["wavelength_angstrom"])
         nominal_time = str(record.get("nominal_time", record["date_obs"]))
         time_tag = nominal_time.replace("-", "").replace(":", "")[0:15]
-        output = args.out / f"aia_{time_tag}_{wavelength:03d}_bottom_x3min.vtk"
+        resolution_suffix = (
+            f"_{int(params['domain_nx1']) * grid_scale}x{int(params['domain_nx2']) * grid_scale}"
+            if grid_scale > 1
+            else ""
+        )
+        output = args.out / f"aia_{time_tag}_{wavelength:03d}_bottom_x3min{resolution_suffix}.vtk"
         item = write_plane(
                 data,
                 output,
@@ -146,6 +167,7 @@ def main() -> None:
                 str(record["date_obs"]),
                 str(record["source"]),
                 args.transform,
+                grid_scale,
             )
         item["input_npy"] = npy.name
         outputs.append(item)
@@ -157,6 +179,9 @@ def main() -> None:
         "transform": args.transform,
         "transform_formula": (
             "log10(max(I, 0) + 1)" if args.transform == "log10p1" else "I"
+        ),
+        "grid_scale_relative_to_par": (
+            args.grid_scale if args.grid_scale is not None else (2 if args.full_resolution else 1)
         ),
         "flattening": "NumPy (y,x) C-order; VTK x index varies fastest",
         "files": outputs,

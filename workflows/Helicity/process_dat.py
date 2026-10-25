@@ -28,6 +28,21 @@ except (ImportError, ModuleNotFoundError) as exc:  # pragma: no cover - 环境�
         "原作者仓库：https://github.com/Astery0502/simesh"
     ) from exc
 
+try:
+    from .helicity_binary import (
+        read_magnetic_data,
+        write_boundary_data,
+        write_helicity_inputs,
+        write_magnetic_data,
+    )
+except ImportError:  # 直接执行 process_dat.py 时使用同目录模块
+    from helicity_binary import (
+        read_magnetic_data,
+        write_boundary_data,
+        write_helicity_inputs,
+        write_magnetic_data,
+    )
+
 
 def init_boundary(filename: str | Path, b1: np.ndarray, b2: np.ndarray, b3: np.ndarray) -> float:
     """按 Fortran 程序要求写出六个外法向磁场边界面。
@@ -35,17 +50,7 @@ def init_boundary(filename: str | Path, b1: np.ndarray, b2: np.ndarray, b3: np.n
     输入磁场数组的轴顺序必须为 ``(z, y, x)``。返回六个面的离散通量和，
     可用作边界通量平衡的快速诊断值。
     """
-    ax, bx = -b1[:, :, 0], b1[:, :, -1]
-    ay, by = -b2[:, 0, :], b2[:, -1, :]
-    az, bz = -b3[0, :, :], b3[-1, :, :]
-    boundary_faces = (ax, bx, ay, by, az, bz)
-
-    flux_sum = 0.0
-    with Path(filename).open("wb") as stream:
-        for face in boundary_faces:
-            np.asarray(face, dtype=np.float64).tofile(stream)
-            flux_sum += float(np.sum(face))
-    return flux_sum
+    return write_boundary_data(filename, b1, b2, b3)
 
 
 def write_binary_data(
@@ -56,32 +61,12 @@ def write_binary_data(
     b3: np.ndarray,
 ) -> None:
     """写出 ``dx, nx, ny, nz, Bx, By, Bz`` 的 Fortran stream 文件。"""
-    nz, ny, nx = b1.shape
-    if b2.shape != (nz, ny, nx) or b3.shape != (nz, ny, nx):
-        raise ValueError("b1、b2、b3 的形状必须一致")
-
-    with Path(filename).open("wb") as stream:
-        np.asarray(dx, dtype=np.float64).tofile(stream)
-        np.asarray((nx, ny, nz), dtype=np.int32).tofile(stream)
-        for component in (b1, b2, b3):
-            np.asarray(component, dtype=np.float64).tofile(stream)
+    write_magnetic_data(filename, dx, b1, b2, b3)
 
 
 def read_binary_data(filename: str | Path) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
     """读取 :func:`write_binary_data` 产生的文件，主要用于检查与测试。"""
-    with Path(filename).open("rb") as stream:
-        dx_values = np.fromfile(stream, dtype=np.float64, count=1)
-        dimensions = np.fromfile(stream, dtype=np.int32, count=3)
-        if dx_values.size != 1 or dimensions.size != 3:
-            raise ValueError(f"文件头不完整：{filename}")
-        nx, ny, nz = (int(value) for value in dimensions)
-        count = nx * ny * nz
-        components = [np.fromfile(stream, dtype=np.float64, count=count) for _ in range(3)]
-        if any(component.size != count for component in components):
-            raise ValueError(f"磁场数据不完整：{filename}")
-
-    fields = tuple(component.reshape(nz, ny, nx) for component in components)
-    return float(dx_values[0]), fields[0], fields[1], fields[2]
+    return read_magnetic_data(filename)
 
 
 def curl(
@@ -229,10 +214,19 @@ def process_data(
         dx, dy, dz = (float(value) for value in spacing)
         number = f"{index:04d}"
 
-        if save_nlfff:
+        if save_nlfff and save_bd:
+            flux_sum = write_helicity_inputs(
+                output_path / "nlfff" / f"nlfff_{number}.binary",
+                output_path / "bd" / f"bd_{number}.binary",
+                dx,
+                w.b1,
+                w.b2,
+                w.b3,
+            )
+            print(f"[{number}] 边界离散通量和：{flux_sum:.8e}")
+        elif save_nlfff:
             write_binary_data(output_path / "nlfff" / f"nlfff_{number}.binary", dx, w.b1, w.b2, w.b3)
-
-        if save_bd:
+        elif save_bd:
             flux_sum = init_boundary(output_path / "bd" / f"bd_{number}.binary", w.b1, w.b2, w.b3)
             print(f"[{number}] 边界离散通量和：{flux_sum:.8e}")
 

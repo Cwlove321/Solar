@@ -1,0 +1,44 @@
+diff --git a/fastqsl.py b/fastqsl.py
+index aec8d39..453a9b9 100644
+--- a/fastqsl.py
++++ b/fastqsl.py
+@@ -2,6 +2,22 @@ import numpy as np
+ import matplotlib.pyplot as plt
+ from matplotlib.colors import ListedColormap
+ import os, subprocess, pickle
++from pathlib import Path
++
++
++def _find_fastqsl_executable():
++    """Return the configured or locally compiled FastQSL2 executable."""
++    configured = os.environ.get('FASTQSL2_EXECUTABLE')
++    executable = Path(configured).expanduser() if configured else Path(__file__).resolve().parent / 'bin' / 'fastqsl.x'
++    executable = executable.resolve()
++    if not executable.is_file():
++        raise FileNotFoundError(
++            f'FastQSL2 executable not found: {executable}. '
++            'Run scripts/build_fastqsl.sh or set FASTQSL2_EXECUTABLE.'
++        )
++    if not os.access(executable, os.X_OK):
++        raise PermissionError(f'FastQSL2 executable is not executable: {executable}')
++    return executable
+ 
+ def fastqsl(Bx=None, By=None, Bz=None, CurlBx=None, CurlBy=None, CurlBz=None, *, 
+             xa=None, ya=None, za=None, spherical=False, \
+@@ -278,14 +294,8 @@ def fastqsl(Bx=None, By=None, Bz=None, CurlBx=None, CurlBy=None, CurlBz=None, *,
+             file.write(np.array([csFlag, preset_xreg, preset_yreg], dtype='i4'))
+ # ------------------------------------------------------------
+     # computed by fastqsl.x
+-    os.chdir(tmp_dir)
+-
+-    # please specify the path
+-    # the following r can avoid the potential problem of '\n' from os.sep ='\' in Windows
+-    # subprocess.run(r'/path/of/fastqsl.x', shell=True)
+-    # subprocess.run(r'~/Desktop/FastQSL2/fastqsl.x', shell=True)
+-    subprocess.run(r'~/Desktop/QSLS/update/fastqsl.x', shell=True)
+-    os.chdir(cdir)
++    executable = _find_fastqsl_executable()
++    subprocess.run([os.fspath(executable)], cwd=tmp_dir, check=True)
+ # ################################### retrieving results ######################################
+ # make the dictionary qsl
+     qsl={}

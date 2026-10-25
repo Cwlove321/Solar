@@ -3,6 +3,9 @@
 本目录包含数据驱动 Cartesian TMF 所需的完整 Python 预处理流程，可以随
 `Cartesian_TMF` 整体复制到另一台机器运行，不需要同时复制 `solar_code/src`、
 `Cartesian_NLFFF` 或旧的 `solar_package/tmf_prep`。
+从全日面 HMI 生成 CEA 的入口改为共用 `Packages/sharp` 官方数值内核，
+这一步需要同时复制该目录并保留与 `workflows` 的相对位置；当前构建支持 macOS。
+详见 [自定义 CEA 与 AIA 工作流](../../observations/README_custom_cea.md)。
 
 ## 独立安装
 
@@ -32,6 +35,11 @@ Fortran 编译器和对应的作业调度环境。
 | `tmf_core/dave4vm/` | 内置 DAVE4VM 求解器、矩阵和导数代码。 |
 | `tmf_core/sharp_boundary.py` | 内置 SHARP CEA 裁剪、分量转换和时间读取。 |
 | `requirements.txt` | 独立运行需要安装的第三方 Python 包。 |
+
+初始 potential/NLFFF 的 Python 写入入口与 Cartesian_NLFFF 保持相同网格检查：
+binning 后、不含文件鬼点的物理 nx、ny 必须只含 2、3、5 质因子；不合格时在写入前
+报错，不自动裁剪。命令行显式设置的 block 必须为正偶数且整除对应网格。
+完整说明见 [NLFFF 输出前的网格检查](../../Cartesian_NLFFF/Preprocess/README.md#输出前的网格检查)。
 
 ## 完整处理流程
 
@@ -80,7 +88,10 @@ python Preprocess/prepare_hmi_b720_timeseries.py \
 
 程序会逐时刻调用同目录的 `make_cea_patch.py`，输出按时间命名的
 `*.Br.fits`、`*.Bt.fits`、`*.Bp.fits`，并把每个时刻的转换参数保存到
-`metadata/`。已完整生成的时刻会自动跳过。
+`metadata/`。仅完整且包含相同官方后端版本及参数的时刻会自动跳过；
+原先近似算法的输出会重算。`--overwrite` 可强制重算。
+默认官方 Wiener6 + 3 倍过采样 + Gaussian；输出为 Carrington CEA，
+输入中心仍为 Stonyhurst。单时刻入口也支持 `--bounds` 日面角秒范围。
 
 ## 第二步：生成 TMF 与初始 NLFFF 边界
 

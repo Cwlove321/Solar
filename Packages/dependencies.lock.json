@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256-path-and-content-v1",
+  "packages": {
+    "simesh": {
+      "path": "Packages/simesh",
+      "management": "vendored",
+      "upstream_url": "https://github.com/Astery0502/simesh",
+      "upstream_commit": "e223ceaa7c0c5d72bbcf24f0143b250ad8ed4a0d",
+      "tree_sha256": "41b1b97327b7ca84b7bbfff84692a90e6616a2e2a2c1b81a05cab4e2d5770fcc",
+      "hash_exclude": [
+        "src/simesh/utils/lib/amr/*.c"
+      ]
+    },
+    "radsyn_tools": {
+      "path": "Packages/radsyn_tools",
+      "management": "vendored",
+      "upstream_url": "https://github.com/fuwentai/radsyn_tools",
+      "upstream_commit": "44a065e843b923b493f7785782cea89a557b3685",
+      "tree_sha256": "54fbfd651730b99e9e432552669b025b761954ac74e49dd0ef88aab466ea65da",
+      "hash_exclude": [
+        "*.pdf"
+      ]
+    },
+    "qsl": {
+      "path": "Packages/qsl",
+      "management": "vendored",
+      "tree_sha256": "262f3d37bc0363e4ac2d48c82ec211e713810339584f54574f88e06c0258bcc5"
+    },
+    "FastQSL2": {
+      "path": "Packages/FastQSL2",
+      "management": "external-git-with-overlay",
+      "upstream_url": "https://github.com/el2718/FastQSL2",
+      "upstream_commit": "1f137ba54bd9fbbf91ab4cea432a0e8dac18c23b",
+      "commit_marker": "UPSTREAM_COMMIT",
+      "tree_sha256": "e17d2bfc5526d40c1e1e984a8075582e075acec68b91e9fa2e5632ff76369d7d",
+      "overlay_files": {
+        ".gitignore": "integrations/FastQSL2/package.gitignore",
+        "LOCAL_README.md": "integrations/FastQSL2/LOCAL_README.md",
+        "scripts/build_fastqsl.sh": "integrations/FastQSL2/build_fastqsl.sh"
+      }
+    },
+    "amrvac": {
+      "path": "Packages/amrvac",
+      "management": "external-git",
+      "upstream_url": "https://github.com/amrvac/amrvac",
+      "upstream_commit": "574fc6e3f76be669bcb066fd2ea10accfa06ab90",
+      "optional": true
+    }
+  }
+}

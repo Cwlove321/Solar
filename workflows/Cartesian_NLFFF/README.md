@@ -5,6 +5,8 @@
 必须复制到独立事件目录后运行；模板不保存边界数据、可执行文件、DAT、VTU
 或旧日志。
 
+这里只维护可复用的预处理、诊断工具和运行模板。固定事件时间、数据路径、裁剪范围、作业号的专用脚本及故障修复记录，放在对应case的 `python/`，运行说明写入case根目录README。
+
 ## 两阶段流程
 
 ```text
@@ -130,6 +132,14 @@ xprobmin3 =   0.1d0           xprobmax3 = 10.992375d0
 模板中保留的 `300×200×200`、旧范围只是历史示例值；运行新事件前必须同时
 修改 potential 与 NLFFF 两个 `amrvac.par`，并与 TMF 参数保持一致。
 
+本工作流的物理 `nx/ny`（binning 后，不含文件鬼点）只选含 **2、3、5 质因子**
+的正整数，同时满足 block 整除。Python 边界入口会在输出前拒绝不合格尺寸，
+例如 `370×220`；`360×216` 配合 block `12³` 是合格示例。这里不是要求维度为
+235 的倍数，也不检查含鬼点的 `364×220` 文件头。检查结果记录在
+`parameters.json/grid_validation`，详情见 [预处理说明](Preprocess/README.md#输出前的网格检查)。
+更改网格后重新生成底边界和势场，不能直接重启旧网格 DAT。运行期间应观察真实 MF
+迭代步数与指标，不能仅凭队列 `RUN` 或 CPU 增长判定外推正常。
+
 ## 势场阶段（potential）
 
 `potential/mod_usr.t` 读取：
@@ -195,6 +205,41 @@ NLFFF restart_from_file 是否为本事件的 lfff 输出
 time_max、dtsave_dat、autoconvert、snapshotnext
 ```
 
+## 初始帧编号与并行启动
+
+从第0步势场开始一次新的外推时，在 **已有 namelist 内**设置：
+
+```fortran
+&filelist
+  snapshotnext=1
+/
+&savelist
+  itsave(1,2)=0
+/
+&mf_list
+  mf_it=0
+/
+```
+
+这里的 `snapshotnext=1` 是读取重启文件时的设置：当前 AMRVAC 先令
+`snapshotini=snapshotnext-1=0`，再在第0步重启时将 `snapshotnext` 减为0。
+因此磁摩擦开始前保存 `nlfff0000.dat`，其内容是松弛第0步的初始场。
+不要为这一启动方式设置 `snapshotnext=0`，否则会减为-1，并产生星号文件名。
+
+`mod_usr.t` 在 `mhd_activate()` 后安装 `start_nlfff_relaxation`，在调用原磁摩擦
+例程前广播 `snapshotini`，保证所有MPI进程共同进入或跳过初始保存；遇到负输出
+编号直接停止。修复随本模板的 `mod_usr.t` 编译，无需修改共享AMRVAC库或额外
+链接旧case的磁摩擦补丁对象。已编译的旧可执行文件不会自动获得此修复。
+
+模板保留 `mf_ditsave=20000`：`0000/0001/0002/0003` 分别对应第
+`0/20000/40000/60000` 步。若算例设为10000，则 `0000` 为第0步，
+`0006` 为第60000步。退出时可能再保存一帧；以磁摩擦日志核对最终步数，
+不能把退出时恢复的主程序时间当作磁摩擦步数。
+
+新外推使用新的输出目录。中断续算应使用实际 `mf_it`，让 `snapshotnext`
+从重启文件继承（移除模板中的显式赋值），不要再次重置为1或覆盖原输出。
+这里的编号说明针对当前AMRVAC的第0步势场重启流程；更换版本后先做短程检查。
+
 ## 编译与提交
 
 每次修改任一 `mod_usr.t` 后，在对应阶段目录重新编译：
@@ -224,7 +269,7 @@ Guoguo 的 `mpi` 队列只接受 64 的整数倍核心数；势场和 NLFFF 的�
 | 势场/NLFFF 网格不一致 | 两阶段的网格参数没有一起更新；应以 `potential_boundary.dat` 的物理尺寸为准。 |
 | 把 `304×154` 当作物理网格 | 这包含每侧两层输入鬼点；物理区域仍为 `300×150`。 |
 | NLFFF restart 失败 | `potential/data/lfff0000.dat` 不存在、使用了不同网格，或没有先运行势场阶段。 |
-| 输出编号不是从 0000 开始 | restart 继承了快照号；在 `&filelist` 显式设 `snapshotnext=0`。 |
+| 输出编号不是从 0000 开始或出现星号 | 新势场外推在 `&filelist` 内设置 `snapshotnext=1`，保留 `itsave(1,2)=0` 和 `mf_it=0`；使用含MPI同步启动包装的新版 `mod_usr.t` 重新编译。详见“初始帧编号与并行启动”。 |
 | 自动 VTU 过慢 | `autoconvert=.true.` 会在每个 DAT 后写较大的 VTU；可先只存 DAT，后续批处理转换。 |
 
 ## 诊断工具

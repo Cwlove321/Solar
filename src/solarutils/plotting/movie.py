@@ -140,6 +140,23 @@ def _make_movie_with_imageio(
     except ImportError as exc:
         raise RuntimeError("imageio is required for the imageio movie backend") from exc
 
+    suffix = output.suffix.lower()
+    if suffix == ".gif":
+        with iio.get_writer(output, mode="I", duration=1000.0 / fps, loop=0) as writer:
+            for path in image_paths:
+                writer.append_data(iio.imread(path))
+        return output
+    if suffix != ".mp4":
+        raise ValueError("the imageio backend supports only .mp4 and .gif outputs")
+
+    try:
+        import imageio_ffmpeg  # noqa: F401
+    except ImportError as exc:
+        raise RuntimeError(
+            "MP4 output with the imageio backend requires imageio-ffmpeg; "
+            "install solarutils[movie]"
+        ) from exc
+
     ffmpeg_params = [
         "-crf",
         MOVIE_QUALITY_PRESETS[quality]["crf"],
@@ -152,6 +169,7 @@ def _make_movie_with_imageio(
     ]
     with iio.get_writer(
         output,
+        format="FFMPEG",
         fps=fps,
         codec="libx264",
         macro_block_size=1,

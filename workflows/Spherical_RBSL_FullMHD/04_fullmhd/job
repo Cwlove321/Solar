@@ -1,0 +1,50 @@
+#!/bin/bash
+#BSUB -q mpi
+#BSUB -n 640
+#BSUB -R "span[ptile=64]"
+#BSUB -J rbsl_fullmhd
+
+set -euo pipefail
+
+TIME_STAMP=$(date +"%Y%m%d_%H%M")
+mkdir -p ./log ./data
+exec > "./log/${TIME_STAMP}.out"
+exec 2> "./log/${TIME_STAMP}.err"
+
+module load intel/oneapi_2023
+GLOBAL_FMHD_LIBDIR=${GLOBAL_FMHD_LIBDIR:-/share/home/guoyang1/apps/global_fmhd_deps/chenpf_libs}
+export LD_LIBRARY_PATH="${GLOBAL_FMHD_LIBDIR}:${LD_LIBRARY_PATH:-}"
+NPROCS=${LSB_DJOB_NUMPROC:-640}
+
+if ((NPROCS % 64 != 0)); then
+  echo "MPI rank count must be a multiple of 64: ${NPROCS}" >&2
+  exit 64
+fi
+
+echo "Job started at $(date), ranks=${NPROCS}"
+rm -f .nan_detected
+mpirun -np "${NPROCS}" ./amrvac -i amrvac.par &
+SIM_PID=$!
+(
+  while kill -0 "${SIM_PID}" 2>/dev/null; do
+    shopt -s nullglob
+    LOGS=(./data/*_.log)
+    if ((${#LOGS[@]})) && grep -Eqi 'NaN|Infinity' "${LOGS[@]}"; then
+      echo "NaN/Infinity detected at $(date); stopping mpirun"
+      touch .nan_detected
+      kill -TERM "${SIM_PID}" 2>/dev/null || true
+      exit
+    fi
+    sleep 10
+  done
+) &
+WATCH_PID=$!
+set +e
+wait "${SIM_PID}"
+RC=$?
+set -e
+kill "${WATCH_PID}" 2>/dev/null || true
+wait "${WATCH_PID}" 2>/dev/null || true
+[[ ! -f .nan_detected ]] || exit 42
+echo "Job finished at $(date), rc=${RC}"
+exit "${RC}"

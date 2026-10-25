@@ -1,0 +1,722 @@
+{
+  "filelist.base_filename": {
+    "meaning": "输出文件的路径和名称前缀；快照通常在前缀后追加四位编号及扩展名。",
+    "unit": "路径字符串",
+    "caveat": "相对路径以启动程序的工作目录为准，不以 .par 所在位置为准；它不是输入 DAT 路径。",
+    "source": "https://amrvac.org/md_doc_2par.html#filelist"
+  },
+  "filelist.restart_from_file": {
+    "meaning": "读取这一 AMRVAC DAT 快照中的场变量、网格树及时间信息作为重启状态。",
+    "unit": "文件路径",
+    "caveat": "VTU 不能替代 restart DAT；firstprocess、reset_time 及用户初始化/边界回调决定读入后是否再修改。",
+    "source": "https://raw.githubusercontent.com/amrvac/amrvac/master/src/amrvac.t#L43-L96"
+  },
+  "filelist.firstprocess": {
+    "meaning": "重启读入 DAT 后再次调用每块的 usr_init_one_grid，允许用户修改已有初态。",
+    "unit": "逻辑值",
+    "caveat": "不是普通重启必需开关。本工作流 initonegrid_usr 首先清零动量；firstprocess=true 且 iprob=2 会执行插绳支路，其他支路可能重建场和大气。续算不要无意重复初始化。",
+    "source": "https://amrvac.org/mod__initialize__amr_8t_source.html#l00076；03_insert/mod_usr.t:234-325"
+  },
+  "filelist.saveprim": {
+    "meaning": "在转换后的可视化输出中使用原始量，如速度和热压，而非动量等演化变量。",
+    "unit": "逻辑值",
+    "caveat": "不把原生 DAT 改成原始量文件；DAT 仍直接保存求解器状态，本工作流能量槽是内能。不能因此把 DAT 的动量当作速度或把能量当压力。",
+    "source": "https://amrvac.org/md_doc_2par.html#filelist；https://amrvac.org/mod__input__output_8t_source.html#l02004"
+  },
+  "filelist.autoconvert": {
+    "meaning": "每次正常快照输出时，除 DAT 外同时按 convert_type 生成可视化文件。",
+    "unit": "逻辑值",
+    "caveat": "false 只关闭在线转换，不关闭 DAT；以后仍可单独转换，true 会增加计算与 I/O 开销。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01738"
+  },
+  "filelist.nwauxio": {
+    "meaning": "转换输出附加的用户诊断变量数量，由 usr_aux_output 计算、usr_add_aux_names 命名。",
+    "unit": "变量个数",
+    "caveat": "不是方程数量，也不是 DAT 中额外演化的变量。必须与 specialvar_output 写入的 nw+1…nw+12 和名称列表匹配，不能随意减小。",
+    "source": "04_fullmhd/mod_usr.t:769-893；https://amrvac.org/md_doc_2par.html#filelist"
+  },
+  "filelist.convert_type": {
+    "meaning": "可视化转换格式；vtuBmpi 指二进制 VTK UnstructuredGrid，支持 MPI 转换，变量插值到单元角点。",
+    "unit": "格式字符串",
+    "caveat": "vtuBmpi 与保存单元中心量的 vtuBCCmpi 不同；角点插值可能平滑或改变局部极值。只有 autoconvert 或单独 convert 时才使用。",
+    "source": "https://amrvac.org/md_doc_2par.html#filelist"
+  },
+  "savelist.ditsave_log": {
+    "meaning": "每经过指定数量的积分步输出一次日志诊断。",
+    "unit": "迭代步",
+    "caveat": "与代码时间间隔不同；步长变化时对应的物理时间间隔也变化。",
+    "source": "https://amrvac.org/md_doc_2par.html#savelist"
+  },
+  "savelist.dtsave_dat": {
+    "meaning": "按指定的模拟代码时间间隔保存 DAT 快照。",
+    "unit": "代码时间；秒数为数值×unit_time",
+    "caveat": "不是积分步长 dt，也不是墙钟时间；autoconvert=true 时同一次快照还生成 VTU。正常终止还会保存最终状态。",
+    "source": "https://amrvac.org/md_doc_2par.html#savelist"
+  },
+  "savelist.itsave(1,1)": {
+    "meaning": "第一条按迭代号指定的日志输出事件；第二索引 1 表示日志。",
+    "unit": "迭代号",
+    "caveat": "设为 0 表示在第 0 步记录日志；重启若不归零迭代号，不等于每次重启都会触发。",
+    "source": "https://amrvac.org/md_doc_2par.html#savelist；https://raw.githubusercontent.com/amrvac/amrvac/master/src/amrvac.t#L374-L401"
+  },
+  "savelist.itsave(1,2)": {
+    "meaning": "第一条按迭代号指定的正常快照事件；第二索引 2 表示 DAT 快照。",
+    "unit": "迭代号",
+    "caveat": "设为 0 可保存积分前的第 0 步状态；不是单独的 VTU 调度，VTU 由 autoconvert 控制。",
+    "source": "https://amrvac.org/md_doc_2par.html#savelist；https://amrvac.org/mod__input__output_8t_source.html#l01738"
+  },
+  "savelist.itsave(1,5)": {
+    "meaning": "第一条按迭代号指定的用户自定义分析事件；第二索引 5 调用 usr_write_analysis。",
+    "unit": "迭代号",
+    "caveat": "不是第五种磁场输出、不是 VTU。本工作流未注册 usr_write_analysis，因此这项通常不额外生成文件。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01778；各阶段 mod_usr.t 的 usr_init"
+  },
+  "stoplist.dtmin": {
+    "meaning": "允许的最小积分时间步；检测到候选 dt 低于此值时停止。",
+    "unit": "代码时间",
+    "caveat": "是失稳/步长塌缩保护阈值，不是强行把 dt 提高到该值；不能用调低它来证明不稳定已修复。",
+    "source": "https://amrvac.org/mod__dt_8t_source.html#l00057"
+  },
+  "stoplist.time_max": {
+    "meaning": "模拟代码时间的结束上限。",
+    "unit": "代码时间",
+    "caveat": "与 it_max、wall_time_max 等条件任一先达到就停止；是否承接 DAT 的绝对时间由 reset_time 决定。设为 0 的初始化阶段不进行正时间演化。",
+    "source": "https://raw.githubusercontent.com/amrvac/amrvac/master/src/amrvac.t#L280-L282"
+  },
+  "stoplist.reset_time": {
+    "meaning": "重启时将代码时间设回 time_init，并同时将迭代号设回 it_init、快照编号设回 0。",
+    "unit": "逻辑值",
+    "caveat": "本工作流未另设 time_init/it_init 时为 0；本项不直接清空场变量，但可能重新触发按时间/迭代定义的加载和输出事件。连续物理时间续算应特别检查。",
+    "source": "https://raw.githubusercontent.com/amrvac/amrvac/master/src/amrvac.t#L52-L58"
+  },
+  "stoplist.wall_time_max": {
+    "meaning": "程序内部的实际运行时长上限。",
+    "unit": "小时",
+    "caveat": "不是物理模拟时间，也不替代调度器队列的墙钟限制；程序会为后续一步和输出预留余量而提前退出。",
+    "source": "https://amrvac.org/mod__global__parameters_8t_source.html#l00055；https://raw.githubusercontent.com/amrvac/amrvac/master/src/amrvac.t#L280"
+  },
+  "stoplist.it_max": {
+    "meaning": "结束迭代号上限。",
+    "unit": "迭代步",
+    "caveat": "不是重启后无条件再跑这么多步；实际起点由 DAT 和 reset_time/reset_it 决定。",
+    "source": "https://raw.githubusercontent.com/amrvac/amrvac/master/src/amrvac.t#L280-L282"
+  },
+  "methodlist.time_stepper": {
+    "meaning": "双曲演化的时间推进阶段数/方法族；threestep 在未指定 time_integrator 时选 SSPRK3。",
+    "unit": "方法字符串",
+    "caveat": "三子步不等于只跑三步；热传导 STS 和分裂源项另有自己的推进设置。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l00882"
+  },
+  "methodlist.flux_scheme": {
+    "meaning": "逐 AMR 层级选择计算单元界面通量的数值格式；hll 为 HLL 近似 Riemann 求解器。",
+    "unit": "每层一个字符串",
+    "caveat": "20*'hll' 是 Fortran 重复赋值，表示 20 个层级槽位都填 hll，不表示启用 20 层；实际层数由 refine_max_level 限定。",
+    "source": "https://amrvac.org/md_doc_2par.html#methodlist"
+  },
+  "methodlist.limiter": {
+    "meaning": "逐 AMR 层级选择重建到界面的斜率限制器；vanleer 与 cada3 是不同重建方案。",
+    "unit": "每层一个字符串",
+    "caveat": "限制器影响精度、耗散与尖锐梯度稳健性；20* 的 20 仍是数组重复次数，不是实际 AMR 层数。",
+    "source": "https://amrvac.org/mod__limiter_8t_source.html；https://amrvac.org/md_doc_2limiter.html"
+  },
+  "methodlist.small_density": {
+    "meaning": "密度的小值/正性处理阈值。",
+    "unit": "代码质量密度；物理值为数值×unit_density",
+    "caveat": "不是初始背景密度。fix_small_values 和 small_values_method 决定遇到低于阈值状态时的处理；replace 会改变状态与守恒预算。",
+    "source": "https://amrvac.org/md_doc_2par.html#methodlist"
+  },
+  "methodlist.small_pressure": {
+    "meaning": "热压的小值/正性处理阈值。",
+    "unit": "代码热压；物理值为数值×unit_pressure",
+    "caveat": "不是温度下限，也不是内能的同一数值；内能与压力通过 gamma−1 换算。若另设正的 small_temperature，核心代码会重算本阈值。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l00669；https://amrvac.org/md_doc_2par.html#methodlist"
+  },
+  "methodlist.fix_small_values": {
+    "meaning": "允许物理模块在变量转换及相关源项操作中处理非物理小值。",
+    "unit": "逻辑值",
+    "caveat": "处理办法由 small_values_method 决定；开启不意味着所有 NaN、Inf 或各子步都已获得可靠保护，仍需检查实际补丁及日志。",
+    "source": "https://amrvac.org/md_doc_2par.html#methodlist"
+  },
+  "methodlist.small_values_method": {
+    "meaning": "发现非物理小值后的策略：error 报错，replace 使用阈值替换，average 用周围有效状态平均。",
+    "unit": "策略字符串",
+    "caveat": "replace 是数值修复而非物理加热/加载；会调整相关变量，动量处理应以实际 MHD 模块和 small_values_fix_iw 为准，不保证守恒。",
+    "source": "https://amrvac.org/mod__small__values_8t_source.html；https://amrvac.org/md_doc_2par.html#methodlist"
+  },
+  "methodlist.check_small_values": {
+    "meaning": "在求热压等路径增加小值检查。",
+    "unit": "逻辑值",
+    "caveat": "与 fix_small_values 不同：这是额外诊断/报错开关，不是修复总开关；false 也不表示全部小值修复和故障检查被关闭。",
+    "source": "https://amrvac.org/md_doc_2par.html#methodlist"
+  },
+  "boundlist.typeboundary_min1": {
+    "meaning": "r 方向内边界（光球底边界）的逐变量边界类型；special 调用用户边界。",
+    "unit": "变量类型数组",
+    "caveat": "当前用户实现将鬼单元动量置零，rho、p 取静力大气表 rbc/pbc；CT 切向面磁场单边外推、法向面磁场由离散散度约束补齐。8* 只是为 8 个 MHD 变量重复赋值；物理边界磁场演化还受电场回调约束。",
+    "source": "04_fullmhd/mod_usr.t:340-425；五阶段 specialbound_usr 有效代码一致"
+  },
+  "boundlist.typeboundary_max1": {
+    "meaning": "r 方向外边界（计算域顶部）的逐变量边界类型；special 调用用户边界。",
+    "unit": "变量类型数组",
+    "caveat": "当前保持 r²rho、r*vtheta、r*vphi 沿径向外推连续，vr 只准非负流出，p/rho（温度）连续；CT 切向面场外推、法向场用散度约束补齐。这不是所有变量简单零梯度。",
+    "source": "04_fullmhd/mod_usr.t:427-488；五阶段 specialbound_usr 有效代码一致"
+  },
+  "boundlist.typeboundary_min2": {
+    "meaning": "余纬 theta 最小端（更靠北一侧）的逐变量边界类型。",
+    "unit": "变量类型数组",
+    "caveat": "当前 special 分支将鬼单元全部动量置零、密度和热压按内部值镜像填充；CT 切向面场单边外推、法向场用散度约束补齐。不是周期边界，也不是保留切向速度的标准反射墙。",
+    "source": "04_fullmhd/mod_usr.t:490-555；五阶段 specialbound_usr 有效代码一致"
+  },
+  "boundlist.typeboundary_max2": {
+    "meaning": "余纬 theta 最大端（更靠南一侧）的逐变量边界类型。",
+    "unit": "变量类型数组",
+    "caveat": "当前 special 分支将鬼单元全部动量置零、密度和热压按内部值镜像填充；CT 切向面场单边外推、法向场用散度约束补齐。不是周期边界。",
+    "source": "04_fullmhd/mod_usr.t:557-621；五阶段 specialbound_usr 有效代码一致"
+  },
+  "boundlist.typeboundary_min3": {
+    "meaning": "经度 phi 最小端的逐变量边界类型。",
+    "unit": "变量类型数组",
+    "caveat": "当前 special 分支将鬼单元全部动量置零、密度和热压按内部值镜像填充；CT 切向面场单边外推、法向场用散度约束补齐。经度两端不周期相接。",
+    "source": "04_fullmhd/mod_usr.t:623-687；五阶段 specialbound_usr 有效代码一致"
+  },
+  "boundlist.typeboundary_max3": {
+    "meaning": "经度 phi 最大端的逐变量边界类型。",
+    "unit": "变量类型数组",
+    "caveat": "当前 special 分支将鬼单元全部动量置零、密度和热压按内部值镜像填充；CT 切向面场单边外推、法向场用散度约束补齐。经度两端不周期相接。",
+    "source": "04_fullmhd/mod_usr.t:689-745；五阶段 specialbound_usr 有效代码一致"
+  },
+  "meshlist.refine_criterion": {
+    "meaning": "自动加密误差估计器；当前值 3 选择 Löhner 型归一化梯度/曲率误差估计。",
+    "unit": "整数选项",
+    "caveat": "随后还执行用户强制细化回调。官方文字页与某些核心版本的打印标签有编号差异；当前 3 的含义已由 mod_errest 的执行支路核验，不能据打印标签猜其他编号。",
+    "source": "https://amrvac.org/mod__errest_8t_source.html#l00021"
+  },
+  "meshlist.refine_max_level": {
+    "meaning": "允许的最高 AMR 层，包含作为 L1 的根网格。",
+    "unit": "层级整数",
+    "caveat": "不是全域都处于最高层；每增加一层每方向分成两份。伸长网格中子单元并非一定是物理长度完全相等的两半。",
+    "source": "https://amrvac.org/mod__global__parameters_8t_source.html；https://amrvac.org/mod__input__output_8t_source.html#l01539"
+  },
+  "meshlist.refine_threshold": {
+    "meaning": "各 AMR 层的误差阈值数组；超过相应阈值的区域请求细化。",
+    "unit": "无量纲误差阈值，每层一个",
+    "caveat": "不是密度数值阈值。本工作流 specialthreshold 会在侧面/顶部附近提高局部容许误差，special_refine_grid 另外强制保留底边界最高层；冻结树后不再动态执行。",
+    "source": "https://amrvac.org/mod__errest_8t_source.html；04_fullmhd/mod_usr.t:749-767,895-925"
+  },
+  "meshlist.derefine_ratio": {
+    "meaning": "粗化误差阈值相对于细化阈值的比例；粗化判定使用 derefine_ratio×相应层的 refine_threshold。",
+    "unit": "无量纲比例，每层一个",
+    "caveat": "不是网格尺寸的粗化倍数。等于 1 意味着不留阈值迟滞间隔，不能读成禁止粗化；最终仍受树相容性、用户强制细化和 itfixgrid 限制。",
+    "source": "https://amrvac.org/mod__errest_8t_source.html"
+  },
+  "meshlist.w_refine_weight(1)": {
+    "meaning": "第一个状态变量（本 MHD 模块为密度）在自动误差估计中的权重。",
+    "unit": "无量纲权重",
+    "caveat": "本文件只设置第一项为 1、其他项默认 0，自动误差估计因此只跟踪密度；所有权重应合计为 1。用户指定的底边界强制细化不受此权重选择限制。",
+    "source": "https://amrvac.org/mod__errest_8t_source.html；https://amrvac.org/mod__input__output_8t_source.html#l01626"
+  },
+  "meshlist.block_nx1": {
+    "meaning": "每个 AMR 块内沿 r 的有效单元数，不含鬼单元。",
+    "unit": "单元数",
+    "caveat": "各层块的单元数相同、覆盖空间尺度不同；须与 domain_nx1 整除关系及核心偶数等约束相容。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01499"
+  },
+  "meshlist.block_nx2": {
+    "meaning": "每个 AMR 块内沿 theta 的有效单元数，不含鬼单元。",
+    "unit": "单元数",
+    "caveat": "各层块的单元数相同；须与 domain_nx2 整除关系及核心偶数等约束相容。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01499"
+  },
+  "meshlist.block_nx3": {
+    "meaning": "每个 AMR 块内沿 phi 的有效单元数，不含鬼单元。",
+    "unit": "单元数",
+    "caveat": "各层块的单元数相同；须与 domain_nx3 整除关系及核心偶数等约束相容。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01499"
+  },
+  "meshlist.domain_nx1": {
+    "meaning": "根网格 L1 覆盖整个径向域的有效单元数。",
+    "unit": "单元数",
+    "caveat": "不是最终全部 AMR 叶单元数；须为 block_nx1 的整数倍。径向伸长开启时单元宽度不均匀。",
+    "source": "https://amrvac.org/md_doc_2par.html#meshlist；https://amrvac.org/mod__input__output_8t_source.html#l01502"
+  },
+  "meshlist.domain_nx2": {
+    "meaning": "根网格 L1 覆盖整个余纬域的有效单元数。",
+    "unit": "单元数",
+    "caveat": "须为 block_nx2 的整数倍；局部细化会提高对应区域分辨率。",
+    "source": "https://amrvac.org/md_doc_2par.html#meshlist；https://amrvac.org/mod__input__output_8t_source.html#l01502"
+  },
+  "meshlist.domain_nx3": {
+    "meaning": "根网格 L1 覆盖整个经度域的有效单元数。",
+    "unit": "单元数",
+    "caveat": "须为 block_nx3 的整数倍；局部细化会提高对应区域分辨率。",
+    "source": "https://amrvac.org/md_doc_2par.html#meshlist；https://amrvac.org/mod__input__output_8t_source.html#l01502"
+  },
+  "meshlist.xprobmin1": {
+    "meaning": "计算域内径 r_min，以球心为原点。",
+    "unit": "代码长度，本工作流为 R_sun=6.955e10 cm",
+    "caveat": "不是离光球的高度；当前 r_min=1 时 h=(r−1)×695.5 Mm。更改计算域必须同步背景场、路径和边界数据。",
+    "source": "04_fullmhd/mod_usr.t:usr_init；https://amrvac.org/mod__global__parameters_8t_source.html#l00015"
+  },
+  "meshlist.xprobmax1": {
+    "meaning": "计算域外径 r_max，以球心为原点。",
+    "unit": "代码长度，本工作流为 R_sun",
+    "caveat": "不是高度本身；高度需减去参考光球半径。重启时必须与 DAT 网格及背景输入一致。",
+    "source": "04_fullmhd/mod_usr.t:usr_init；https://amrvac.org/mod__global__parameters_8t_source.html#l00015"
+  },
+  "meshlist.xprobmin2": {
+    "meaning": "计算域余纬 theta 的最小值；余纬从北极向南增加。",
+    "unit": "2π 为 1 的角度单位，即数值×360°",
+    "caveat": ".par 中不是弧度，也不是纬度；代码读入后乘 2π。纬度=90°−theta。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01478"
+  },
+  "meshlist.xprobmax2": {
+    "meaning": "计算域余纬 theta 的最大值。",
+    "unit": "2π 为 1 的角度单位，即数值×360°",
+    "caveat": ".par 中不是弧度；转换成纬度时纬度=90°−theta，因此 theta_max 对应更南端。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01478"
+  },
+  "meshlist.xprobmin3": {
+    "meaning": "计算域经度 phi 的最小值。",
+    "unit": "2π 为 1 的角度单位，即数值×360°",
+    "caveat": ".par 中不是度数或弧度；须与 path.dat、PFSS/磁图的同一经度约定一致。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01478"
+  },
+  "meshlist.xprobmax3": {
+    "meaning": "计算域经度 phi 的最大值。",
+    "unit": "2π 为 1 的角度单位，即数值×360°",
+    "caveat": "改变角域不等于旋转或重映射已有 DAT；必须同步网格、路径和磁边界。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01478"
+  },
+  "meshlist.stretch_dim(1)": {
+    "meaning": "径向网格伸长类型；uni 为单向几何伸长，none 为不伸长，symm 为对称伸长。",
+    "unit": "类型字符串",
+    "caveat": "uni 不是 uniform 均匀网格；本配置 q>1 时沿 r 向外单元逐渐变宽。后处理必须使用原 .par 的伸长映射重建真实坐标。",
+    "source": "https://amrvac.org/md_doc_2par.html#meshlist；https://amrvac.org/mod__input__output_8t_source.html#l01517"
+  },
+  "meshlist.qstretch_baselevel(1)": {
+    "meaning": "L1 径向相邻单元宽度的比值 q=Δr_(i+1)/Δr_i。",
+    "unit": "无量纲比例",
+    "caveat": "不是相邻径向坐标比，也不是块宽比。L层使用 q_L=q_1^(1/2^(L−1))；首单元宽度由总域宽和几何级数确定。更改 q 会改变所有径向节点，不能忽略它读取 DAT。",
+    "source": "https://amrvac.org/mod__input__output_8t_source.html#l01534"
+  },
+  "meshlist.ditregrid": {
+    "meaning": "动态 AMR 重新评估和重建树的积分步间隔。",
+    "unit": "迭代步",
+    "caveat": "只有树未被冻结时才执行；itfixgrid=0 会让演化期间的动态重网格关闭，即使本项为 3 也不是每 3 步重网格。",
+    "source": "https://raw.githubusercontent.com/amrvac/amrvac/master/src/amrvac.t#L300-L311"
+  },
+  "meshlist.itfixgrid": {
+    "meaning": "达到此迭代号起冻结 AMR 层级树。",
+    "unit": "迭代号",
+    "caveat": "0 表示从演化开始固定现有树，不表示关闭此限制；它不取消新算例初始化阶段的建树，亦不禁止现有固定树上的 MHD 推进。",
+    "source": "https://raw.githubusercontent.com/amrvac/amrvac/master/src/amrvac.t#L405-L410"
+  },
+  "meshlist.max_blocks": {
+    "meaning": "每个 MPI 进程允许分配的网格块数量上限。",
+    "unit": "块/进程",
+    "caveat": "不是全局叶块总数，也不是MPI核数；加大此值会增加部分索引/树数组内存开销，但不会直接提高空间分辨率。",
+    "source": "https://amrvac.org/md_doc_2par.html#meshlist；https://amrvac.org/mod__errest_8t_source.html#l00046"
+  },
+  "meshlist.iprob": {
+    "meaning": "用户代码的算例分支编号；本工作流 1 用于 PFSS 矢势构造，2 用于 RBSL 矢势及重启插绳分支。",
+    "unit": "整数编号",
+    "caveat": "不是通用物理开关。必须结合 firstprocess、restart_from_file 和当前阶段源码理解；普通续算 firstprocess=false 不会仅因 iprob=1 就重新覆盖内部磁场。",
+    "source": "03_insert/mod_usr.t:236,1021-1118；04_fullmhd/mod_usr.t:227,1012-1109"
+  },
+  "paramlist.typecourant": {
+    "meaning": "多维 CFL 约束的组合方式；maxsum 先对同一单元各方向 cmax/Δs 求和，再取空间最大值，dt_CFL=CFL/max_cells(sum_d(cmax_d/Δs_d))。",
+    "unit": "方法字符串",
+    "caveat": "球坐标/伸长网格使用真实物理路径长度 Δs（含球面度量），不能把角度差直接当长度；全局 dt 还可能受其他物理、源项、输出和终止时刻约束。",
+    "source": "https://amrvac.org/mod__dt_8t_source.html#l00207"
+  },
+  "paramlist.courantpar": {
+    "meaning": "CFL 数，即传播稳定性时间步前的无量纲安全系数。",
+    "unit": "无量纲",
+    "caveat": "并非固定时间步；在状态和网格相同时减小它通常降低 CFL 上限，但实际 dt 可能由别的限制决定。较大 CFL 不等价于更准确或必然稳定。",
+    "source": "https://amrvac.org/mod__dt_8t_source.html#l00024；https://amrvac.org/mod__dt_8t_source.html#l00234"
+  },
+  "mhd_list.mhd_energy": {
+    "meaning": "是否求解能量方程；true 表示热力学状态随能量演化，并允许热传导、辐射等能量源项。能量变量具体是总能量还是内能由 mhd_internal_e 等开关决定。",
+    "unit": "逻辑值",
+    "caveat": "本工作流采用 true；不能把它解释成‘必定求解总能量’。改为 false 会切换为多方/等温闭合，且当前用户源项和初态链路未作为该分支的完整方案验证。",
+    "source": "[AMRVAC MHD 源码](https://amrvac.org/mod__mhd__phys_8t_source.html)，mhd_physics_init；本阶段 mod_usr.t 的 initglobaldata_usr"
+  },
+  "mhd_list.mhd_gravity": {
+    "meaning": "启用重力源项；本工作流由 usr_gravity 回调给出球坐标径向太阳引力，角向分量为零。",
+    "unit": "逻辑值；回调内部加速度为代码单位",
+    "caveat": "只控制演化中的重力，不会自动替换或重新平衡所读入 DAT 的大气。具体径向函数在本阶段 mod_usr.t 的 getggrav/gravity 中。",
+    "source": "本阶段 mod_usr.t 的 usr_init、gravity、getggrav；[AMRVAC MHD 源码](https://amrvac.org/mod__mhd__phys_8t_source.html)"
+  },
+  "mhd_list.typedivbfix": {
+    "meaning": "磁场无散条件的数值处理方法；ct 为约束输运，使用网格面上的磁场与边上的电场更新磁通，保持离散磁场散度。",
+    "unit": "字符串枚举",
+    "caveat": "本工作流的磁场初始化、插绳和底边界均按 CT 面心磁场设计，不能只替换此字符串就改用另一种方法；CT 不等于把任意错误初场自动清成无散。",
+    "source": "[AMRVAC 参数说明：Magnetic field divergence fixes](https://amrvac.org/md_doc_2par.html)"
+  },
+  "mhd_list.mhd_thermal_conduction": {
+    "meaning": "启用抛物型热传导能量项；MHD 中以沿磁场方向导热为主，垂直分量及饱和限制由 tc_list 控制，时间推进由 STS 加速。",
+    "unit": "逻辑值",
+    "caveat": "需要能量方程。关闭时 tc_list 中的传导设置不产生传导更新；开启并不表示恒温或已经达到热平衡。",
+    "source": "[AMRVAC 热传导源码](https://amrvac.org/mod__thermal__conduction_8t_source.html)"
+  },
+  "mhd_list.mhd_radiative_cooling": {
+    "meaning": "光学薄辐射冷却主开关；开启后按所选冷却曲线向能量方程加入局部损失，形式为 −n_e n_H Λ(T)。",
+    "unit": "逻辑值",
+    "caveat": "false 时即使写了 rc_list，也不会施加该辐射项；与后处理辐射合成、背景加热开关相互独立，不包含光子的非局地输运和吸收反馈。",
+    "source": "[AMRVAC 辐射冷却说明](https://amrvac.org/md_doc_2radiative__cooling.html)；本阶段 mod_usr.t 的 specialsource/getbQ"
+  },
+  "mhd_list.mhd_semirelativistic": {
+    "meaning": "启用半相对论 MHD 修正，借助约化光速减弱极低密度、强磁场区过大的 Alfvén 特征速度限制。",
+    "unit": "逻辑值",
+    "caveat": "不是完整相对论 MHD。与 mhd_internal_e=true 联用时走近似分裂半相对论分支；约化光速应足够高，避免改变关心的动力学。",
+    "source": "[AMRVAC 参数说明：Solve semirelativistic MHD](https://amrvac.org/md_doc_2par.html)"
+  },
+  "mhd_list.mhd_reduced_c": {
+    "meaning": "半相对论修正使用的约化光速；当前 6.d8 为 6×10^8 cm/s，即 6000 km/s。",
+    "unit": "本工作流 CGS 下输入 cm/s，不是通常的代码速度",
+    "caveat": "仅 mhd_semirelativistic=true 时使用。官方源码对此大于 1 的输入通过 (unit_velocity/mhd_reduced_c)^2 转成代码系数；小于 1 的输入有另一个无量纲分支，因此不要把普通代码速度数值直接填入而不核对版本。",
+    "source": "[AMRVAC MHD 源码](https://amrvac.org/mod__mhd__phys_8t_source.html)，mhd_physical_units 中 inv_squared_c 分支"
+  },
+  "mhd_list.mhd_internal_e": {
+    "meaning": "以热内能方程代替总能量方程；无额外状态方程修正时气压 p=(γ−1)e_int，避免从大总能量中减去磁能和动能所产生的严重相消误差。",
+    "unit": "逻辑值",
+    "caveat": "不是同时演化两套能量并自动切换的 dual-energy 开关。需要 mhd_energy=true；内部 DAT 的 e 是内能，不能再次扣除磁能和动能来计算温度。",
+    "source": "[AMRVAC 参数说明：Solve internal or hydrodynamic energy](https://amrvac.org/md_doc_2par.html)；[MHD 源码](https://amrvac.org/mod__mhd__phys_8t_source.html)"
+  },
+  "mhd_list.mhd_trac": {
+    "meaning": "开启 TRAC 过渡区自适应导热修正，以数值拓宽未充分分辨的过渡区，并协调导热及适用的热源/辐射项，减轻低分辨率导致的蒸发通量偏差。",
+    "unit": "逻辑值",
+    "caveat": "不是网格 AMR 开关，也不是温度地板。TRAC 的局部 Tcoff 与辐射适用下限 tcool_cutoff 是不同量；它不会自行开启已关闭的热传导、辐射或背景加热。",
+    "source": "[AMRVAC 参数说明：The transition region adaptive conduction method](https://amrvac.org/md_doc_2par.html)；本阶段 mod_usr.t 的 getbQ"
+  },
+  "mhd_list.mhd_trac_type": {
+    "meaning": "选择 TRAC 算法；2 为局部 LTRAC 方法（源码标注 Iijima 等 2021），由温度梯度与网格尺度在局部计算展宽修正，不需要沿完整磁力线全局追踪。",
+    "unit": "整数枚举",
+    "caveat": "只有 mhd_trac=true 才生效；2 不是 AMR 的第二层，也不是二阶时间积分的编号。其他类型对几何和磁力线追踪有不同要求，不能视为任意互换。",
+    "source": "[AMRVAC MHD 源码](https://amrvac.org/mod__mhd__phys_8t_source.html)，mhd_get_tcutoff 的 case(2)；[参数说明](https://amrvac.org/md_doc_2par.html)"
+  },
+  "mhd_list.mhd_gamma": {
+    "meaning": "理想气体比热比 γ；当前 5/3 用于内能与气压转换及相关声速、热力学项。",
+    "unit": "无量纲",
+    "caveat": "不是密度归一化参数，也不是 mhd_adiab。更改它会改变能量与压力关系；读入既有 DAT 时需要保证状态含义一致。",
+    "source": "[AMRVAC MHD 源码](https://amrvac.org/mod__mhd__phys_8t_source.html)，gamma_1、mhd_get_pthermal"
+  },
+  "mhd_list.mhd_adiab": {
+    "meaning": "不求解能量方程时，多方关系 p=Kρ^γ 中的系数 K；γ=1 时对应等温闭合系数。",
+    "unit": "代码单位 p/ρ^γ",
+    "caveat": "当前各文件 mhd_energy=true，因此它不决定当前大气温度，也不是‘γ=1.4’。本工作流无能量方程分支还会将它赋给 Tiso，但该分支并非当前配置。",
+    "source": "[AMRVAC MHD 源码](https://amrvac.org/mod__mhd__phys_8t_source.html)，mhd_check_params/mhd_get_pthermal；本阶段 mod_usr.t 的 initglobaldata_usr"
+  },
+  "mhd_list.mhd_eta": {
+    "meaning": "电阻感应项的常系数，控制磁扩散与相应焦耳加热；正值使用空间常数，零关闭显式电阻，负值用于调用用户定义电阻函数。",
+    "unit": "代码磁扩散系数；物理磁扩散率 = mhd_eta × unit_length²/unit_time，CGS 为 cm²/s",
+    "caveat": "不是直接以 Ω·m 或 CGS 电导倒数输入。当前为正值；usr_special_resistivity 注册被注释，不能改成负值就认为异常电阻已可用。此项还可能施加扩散稳定性时间步限制。",
+    "source": "[AMRVAC MHD 源码](https://amrvac.org/mod__mhd__phys_8t_source.html)，add_source_res2 与 get_dt_res；本阶段 mod_usr.t 的 usr_init"
+  },
+  "rc_list.coolcurve": {
+    "meaning": "选择光学薄辐射损失函数 Λ(T)；JCcorona 为代码内置的日冕冷却表，源码标注 Colgan & Feldman，表的低温端约为 10^4 K。",
+    "unit": "字符串；表的物理 Λ(T) 通常为 erg cm³ s⁻¹，初始化后转为代码系数",
+    "caveat": "只在辐射主开关开启时作用。该曲线不是 Hα 辐射转移模型，也不是用来固定模拟温度的经验大气表。",
+    "source": "[AMRVAC 辐射说明](https://amrvac.org/md_doc_2radiative__cooling.html)；本地 mod_radiative_cooling.t 的 JCcorona 分支与单位转换"
+  },
+  "rc_list.ncool": {
+    "meaning": "内部重采样冷却表的温度网格点数；用于插值 Λ(T) 及构造精确冷却积分所需表。",
+    "unit": "整数个点",
+    "caveat": "不是空间网格数，也不是每步辐射子步数。增大它细化冷却表采样，但不能补足空间过渡区分辨率；仅辐射模块启用时使用。",
+    "source": "本地 mod_radiative_cooling.t 的辐射表初始化（allocate tcool/Lcool/Yc 与 ncool 循环）"
+  },
+  "rc_list.tcool_cutoff": {
+    "meaning": "本项目扩展的光学薄冷却适用下限；当前共享源码采用 max(tcool_cutoff,tcoolmin)，已低于或等于它的单元不施加该冷却项，从高温侧冷却时也不由该项跨过下限。当前 0.02 对应 20000 K。",
+    "unit": "代码温度；乘 unit_temperature=10^6 K 得物理温度",
+    "caveat": "不是全域温度地板，不会把原本更冷的单元加热到此温度；与 TRAC Tcoff 不同。2026-10-22 已只读核实 guoguo 共享源码支持该扩展；工作流未随包锁定底层源码，换 AMRVAC_DIR 或沿用旧二进制时仍应核对。",
+    "source": "guoguo:/share/home/guoyang1/codes/amrvac/src/physics/mod_radiative_cooling.t:613–619（归一截止）、1128–1141（跳过低温与限制可损失内能），2026-10-22 只读核验"
+  },
+  "rc_list.tfix": {
+    "meaning": "辐射源更新后的可选硬温度地板开关；true 时为低于 tlow 的单元补加内能，使其回到 tlow 对应温度。",
+    "unit": "逻辑值",
+    "caveat": "false 不会调用该地板修复；这并不关闭辐射冷却本身。Tfix=true 可能人为加热原本更冷的光球/色球。需辐射模块实际参与源项更新才执行，不能当成所有子步骤随时生效的全局限温器。",
+    "source": "guoguo:/share/home/guoyang1/codes/amrvac/src/physics/mod_radiative_cooling.t:892–947，radiative_cooling_add_source、floortemperature；2026-10-22 只读核验"
+  },
+  "rc_list.tlow": {
+    "meaning": "当前共享源码将 tlow 与 tcool_cutoff 分离；tlow 是 Tfix 所使用的硬温度地板目标，0.008 对应 8000 K。",
+    "unit": "代码温度；乘 unit_temperature=10^6 K 得物理温度",
+    "caveat": "Tfix=false 时不施加此硬地板；不能把它当作本组 20000 K 的冷却适用截止。旧版/另一版 AMRVAC 可能还把 tlow 用于冷却积分下限，故换源码或二进制时须再次核对。",
+    "source": "guoguo:/share/home/guoyang1/codes/amrvac/src/physics/mod_radiative_cooling.t:74–84、892–947、1130–1139，2026-10-22 只读核验"
+  },
+  "rc_list.rc_split": {
+    "meaning": "是否把辐射冷却作为独立的算子分裂源项更新，而不是放入常规流体源项调用分支。",
+    "unit": "逻辑值",
+    "caveat": "仅辐射主开关开启时有作用；不改变 Λ(T)，也不是磁场背景分裂。具体半步/整步调用顺序还由全局源项推进设置和编译源码决定。",
+    "source": "本地 mod_radiative_cooling.t 的 radiative_cooling_add_source 中 qsourcesplit .eqv. fl%rc_split"
+  },
+  "tc_list.tc_perpendicular": {
+    "meaning": "是否加入垂直于局部磁场方向的热传导；false 保留沿场传导，不添加该垂直传导分量。",
+    "unit": "逻辑值",
+    "caveat": "仅 mhd_thermal_conduction=true 时使用；false 不是把所有方向的导热关掉，热流仍可沿弯曲磁力线具有径向、纬向和经向分量。",
+    "source": "[AMRVAC 热传导源码](https://amrvac.org/mod__thermal__conduction_8t_source.html)，tc_perpendicular 与导热张量"
+  },
+  "tc_list.tc_saturate": {
+    "meaning": "启用热流饱和限制，避免经典导热通量在极大温度梯度下无限增大。",
+    "unit": "逻辑值",
+    "caveat": "仅热传导开启时有效；不是温度上限，也不是将温度强制截断。它限制的是热量输运通量而不是气体温度。",
+    "source": "[AMRVAC 热传导源码](https://amrvac.org/mod__thermal__conduction_8t_source.html)，tc_saturate 分支"
+  },
+  "sts_list.sts_dtpar": {
+    "meaning": "STS 计算显式扩散基准时间步的安全系数，参与估计完成当前宏时间步所需的超时间推进子步数；本工作流主要用于热传导。",
+    "unit": "无量纲",
+    "caveat": "不是 MHD 的 courantpar，也不是输出间隔。官方实现初始化时除以 ndim，再乘各 STS 项返回的显式时间步；三维输入 0.2 对应内部乘子 0.2/3。减小通常增加子步工作量，不能简单说全局 dt 必定乘 0.2。",
+    "source": "[AMRVAC STS 源码](https://amrvac.org/mod__supertimestepping_8t_source.html)，sts_init 与 set_dt_sts_ncycles"
+  },
+  "atmosphere_list.atmosphere_model": {
+    "meaning": "初始和底边界的一维径向静力大气温度剖面：analytic_tr 为低层 tanh 过渡区与上层恒定导热通量解析剖面拼接；isothermal 为整张初始/边界大气表恒温。随后积分 dp/dr=-rho GM/r² 构造压力和密度。",
+    "unit": "字符串：analytic_tr 或 isothermal",
+    "caveat": "这不是时间演化中的恒温开关；isothermal 不会关闭 MHD 能量方程。mhd_energy=true 时建表。重启保留 DAT 内部状态，但仍会重建底边界大气，必须与来源初态一致。",
+    "source": "03_insert/mod_usr.t:1396; 03_insert/mod_usr.t:2117"
+  },
+  "atmosphere_list.atmosphere_normalization": {
+    "meaning": "静力大气密度/压力共同缩放的锚定方式：number_density 在指定参考高度固定 n_H；pressure 在同一参考高度固定气压。两者均用空间线性插值求锚点，缩放不改变温度剖面。",
+    "unit": "字符串：number_density 或 pressure",
+    "caveat": "只使用选中方式对应的目标值；不是同时强制密度和压力。当前默认 number_density 对应成功 RBSL15；pressure 不等于恢复旧代码的错误插值。",
+    "source": "03_insert/mod_usr.t:1398; 03_insert/mod_usr.t:2187"
+  },
+  "atmosphere_list.atmosphere_reference_height_mm": {
+    "meaning": "大气归一化参考高度，相对模型底面；在此处把 n_H 或气压固定为所选目标。",
+    "unit": "Mm",
+    "caveat": "必须位于包含 ghost 区的一维大气表覆盖范围内。当前 10 Mm 配合 number_density，而 pressure 模式也使用这一高度，不会自动改用底部。",
+    "source": "03_insert/mod_usr.t:2133; 03_insert/mod_usr.t:2174"
+  },
+  "atmosphere_list.atmosphere_reference_nh_cgs": {
+    "meaning": "number_density 归一化时参考高度处的氢数密度 n_H；代码用 n_H/unit_numberdensity 作为无量纲密度锚点。",
+    "unit": "cm^-3",
+    "caveat": "不是质量密度 g cm^-3，也不是电子数密度。pressure 模式下不参与缩放，但仍须是有限正数以通过检查。",
+    "source": "03_insert/mod_usr.t:1405; 03_insert/mod_usr.t:2134; 03_insert/mod_usr.t:2198"
+  },
+  "atmosphere_list.atmosphere_reference_pressure_cgs": {
+    "meaning": "pressure 归一化时参考高度处的气体热压目标。",
+    "unit": "erg cm^-3，等价 dyn cm^-2",
+    "caveat": "number_density 模式下不参与缩放；138.365 不是当前密度归一化下实际参考压力的声明。切换 pressure 前须同时核对参考高度和值。",
+    "source": "03_insert/mod_usr.t:2135; 03_insert/mod_usr.t:2198"
+  },
+  "atmosphere_list.atmosphere_chromosphere_k": {
+    "meaning": "analytic_tr 低温支 tanh 曲线的低温渐近值 T_chromosphere。",
+    "unit": "K",
+    "caveat": "要求 0 < T_chromosphere < T_transition < T_tanh_top。实际最低表温是 floor_height 处 tanh 的值，不严格等于渐近值；isothermal 时不用于剖面。",
+    "source": "03_insert/mod_usr.t:1414; 03_insert/mod_usr.t:2136; 03_insert/mod_usr.t:2161"
+  },
+  "atmosphere_list.atmosphere_tanh_top_k": {
+    "meaning": "analytic_tr 的低层 tanh 分支高温渐近参数，用于确定 tanh 形状和拼接偏移。",
+    "unit": "K",
+    "caveat": "不是计算域顶端温度、不是日冕全域恒定温度；上层实际温度由导热通量公式计算。仅 analytic_tr 使用。",
+    "source": "03_insert/mod_usr.t:2137; 03_insert/mod_usr.t:2149"
+  },
+  "atmosphere_list.atmosphere_transition_height_mm": {
+    "meaning": "analytic_tr 低层 tanh 与上层导热通量温度支的连接高度 h_tr；该处温度为 atmosphere_transition_K。",
+    "unit": "Mm，相对底面",
+    "caveat": "因代码平移 tanh 以满足指定连接温度，此高度不是未平移 tanh 的中心。floor_height 必须小于它。",
+    "source": "03_insert/mod_usr.t:2138; 03_insert/mod_usr.t:2153"
+  },
+  "atmosphere_list.atmosphere_transition_width_mm": {
+    "meaning": "analytic_tr 中 tanh 自变量的长度尺度 w_tr，控制过渡区温度变化的陡峭程度。",
+    "unit": "Mm",
+    "caveat": "必须为正；不是过渡区完整几何厚度或 AMR 网格宽度。isothermal 下不参与剖面，但仍通过参数检查。",
+    "source": "03_insert/mod_usr.t:1410; 03_insert/mod_usr.t:2139; 03_insert/mod_usr.t:2161"
+  },
+  "atmosphere_list.atmosphere_transition_k": {
+    "meaning": "analytic_tr 在 h_tr 连接处的温度 T_tr，同时作为上层导热通量解析式的温度锚点。",
+    "unit": "K",
+    "caveat": "须严格位于 chromosphere_K 和 tanh_top_K 之间；不是辐射冷却截止温度。",
+    "source": "03_insert/mod_usr.t:1414; 03_insert/mod_usr.t:2140; 03_insert/mod_usr.t:2159"
+  },
+  "atmosphere_list.atmosphere_conductive_flux_cgs": {
+    "meaning": "构造 analytic_tr 上层静力大气温度曲线的恒定导热通量幅值 F_c；T(h)=[T_tr^(7/2)+(7/2)F_c(h-h_tr)/kappa_0]^(2/7)，物理单位下 kappa_0=8e-7。",
+    "unit": "erg cm^-2 s^-1",
+    "caveat": "要求非负；这是初始/底边界大气表的构造参数，不是运行中强制处处保持的热通量，也不自动开启 mhd_thermal_conduction。仅 analytic_tr 使用。",
+    "source": "03_insert/mod_usr.t:1412; 03_insert/mod_usr.t:2141; 03_insert/mod_usr.t:2148"
+  },
+  "atmosphere_list.atmosphere_floor_height_mm": {
+    "meaning": "analytic_tr 低层温度向下延拓的冻结高度；低于此高度，温度取该高度的 tanh 值，避免继续下降。",
+    "unit": "Mm，相对底面，可为负",
+    "caveat": "是温度剖面的高度阈值，不是 small_temperature 或密度下限；必须低于 transition_height。主要影响低层/ghost 区。",
+    "source": "03_insert/mod_usr.t:1418; 03_insert/mod_usr.t:2142; 03_insert/mod_usr.t:2163"
+  },
+  "atmosphere_list.atmosphere_isothermal_k": {
+    "meaning": "选择 isothermal 时整张初始/底边界静力大气表的恒定温度。密度仍随重力作静力分层。",
+    "unit": "K",
+    "caveat": "仅 isothermal 用于剖面；analytic_tr 模式下闲置但仍要求有限且为正。不会强迫后续三维演化恒温。",
+    "source": "03_insert/mod_usr.t:1407; 03_insert/mod_usr.t:2156"
+  },
+  "mag_list.do_rbsl": {
+    "meaning": "启用目标 RBSL 轴和磁场参数的准备。在 01_pfss / 01_pfss_global_ct 新建背景时，还先从输入光球 Br 扣除该目标绳的 Br 再外推；在 03_insert 配合 restart、firstprocess=true、iprob=2 准备并叠加磁绳。",
+    "unit": "逻辑值",
+    "caveat": "不是“DAT 内是否存在磁绳”的标志，也不是独立通用插入开关。实际 restart 叠加分支由 firstprocess/iprob=2 控制，不应只改此项。02/04 默认 false 是保留已存背景/磁绳、不重复构造。",
+    "source": "01_pfss/mod_usr.t:1487; 01_pfss_global_ct/mod_usr.t:1432; 03_insert/mod_usr.t:160; 03_insert/mod_usr.t:235"
+  },
+  "mag_list.bflux": {
+    "meaning": "RBSL 磁绳轴向磁通 F；内部转为 F_flx=Bflux/(unit_magneticfield*unit_length²)，与半径一起决定代码中的电流参数。",
+    "unit": "Mx，等价 G cm²",
+    "caveat": "不是磁场强度 G，也不是质量加载。当前模型 I_cur=±5√2 F_flx/(12πa0)，不是另行独立指定电流。扣除背景与插绳时必须使用相同磁通、半径、路径和方向；普通续算不会据此重缩放 DAT 内磁场。",
+    "source": "03_insert/mod_usr.t:1302; 03_insert/mod_usr.t:2001"
+  },
+  "mag_list.i_helix": {
+    "meaning": "传入 RBSL_flux_rope 的 positive_helicity：true 选正螺度的电流-磁通关系，false 选负螺度；对正 Bflux 分别取正/负 I_cur。",
+    "unit": "逻辑值",
+    "caveat": "控制螺度符号，不是电流数值或路径端点顺序；轴向场的空间方向还取决于 path.dat 顺序、flip_axis 和磁通符号。",
+    "source": "03_insert/mod_usr.t:1974; 03_insert/mod_usr.t:2001"
+  },
+  "mag_list.rmfr": {
+    "meaning": "RBSL 磁绳小半径 a0，内部换算 a0=Rmfr*1e8/unit_length。直接密度加载的归一化横向距离也使用该半径。",
+    "unit": "Mm",
+    "caveat": "不是大半径、轴高度或直径。只改续算 .par 不会改变 DAT 中已存在的绳半径；更改初态需一致地重新扣除和插入。",
+    "source": "03_insert/mod_usr.t:1304; 03_insert/mod_usr.t:1448"
+  },
+  "mag_list.npoints": {
+    "meaning": "path.dat 的观测/日冕轴采样点数 np；代码添加反向地下镜像段形成 2*np 个积分轴点。",
+    "unit": "整数，点数",
+    "caveat": "path.dat 必须为小端 float64 交错三元组 (经度deg, 纬度deg, 半径Rsun)，严格 24*npoints 字节；纬度不是余纬，第三列不是高度Mm。更多点会增加 RBSL 积分成本，不是 AMR 分辨率。",
+    "source": "03_insert/mod_usr.t:1305; 03_insert/mod_usr.t:1750; 03_insert/mod_usr.t:1774; 03_insert/mod_usr.t:1800"
+  },
+  "mag_list.flip_axis": {
+    "meaning": "反转输入日冕轴及其镜像闭合段的积分方向。",
+    "unit": "逻辑值",
+    "caveat": "会改变轴向场/电流的空间方向和足点极性配对；不是只改变绘图顺序，也不是等价翻转 I_Helix。扣除与插绳两步须保持一致。",
+    "source": "03_insert/mod_usr.t:1812; 03_insert/mod_usr.t:2018"
+  },
+  "mag_list.weak_field": {
+    "meaning": "在 initvecpot_usr 返回前把其构造的矢势 A 乘 wf_scale，因而缩放此初始化分支经 curl(A) 得到的磁场。",
+    "unit": "逻辑值",
+    "caveat": "不是运行中全场限幅开关。restart 的 rbsl_vectorpotential CT 叠加分支没有此乘法，也不会自动把读取 DAT 的已有磁场缩放；不能把它写成“全程把所有磁场乘 wf_scale”。",
+    "source": "03_insert/mod_usr.t:1112; 03_insert/mod_usr.t:2337"
+  },
+  "mag_list.wf_scale": {
+    "meaning": "weak_field=true 时 initvecpot_usr 所返回矢势的乘法缩放系数。",
+    "unit": "无量纲",
+    "caveat": "当前 weak_field=false 时 0 值不生效；若直接打开 weak_field 而保留 0，将令相应初始化矢势为零。并非密度缩放或全域所有 restart 磁场的自动缩放。",
+    "source": "03_insert/mod_usr.t:1112; 03_insert/mod_usr.t:1277"
+  },
+  "mag_list.load_filament_density": {
+    "meaning": "在一次性 restart 插入分支中调用 enhance_filament_density，按到轴的距离在指定高度以上直接乘大密度。",
+    "unit": "逻辑值",
+    "caveat": "须实际进入 restart + firstprocess + iprob=2 分支，并有已准备的轴数据。只改密度，不同步增加内能，因而同压下温度下降；这是瞬时加载，不是 liakh_mass_loading 时间源。02/04 普通续算 false 不会删除原有暗条物质。",
+    "source": "03_insert/mod_usr.t:235; 03_insert/mod_usr.t:261; 03_insert/mod_usr.t:1423"
+  },
+  "mag_list.filament_density_factor": {
+    "meaning": "瞬时直接加载在核心区的最终密度乘数 f；实际乘数 1+(f-1)w，到磁绳外缘平滑回到 1。",
+    "unit": "无量纲倍数",
+    "caveat": "仅 load_filament_density=true 且进入插入分支生效；不是全域倍数，也不是 Liakh 的总增量 contrast。",
+    "source": "03_insert/mod_usr.t:1450; 03_insert/mod_usr.t:1457"
+  },
+  "mag_list.filament_core_fraction": {
+    "meaning": "瞬时加载的平顶核心半径占 a0 的比例 c；d/a0<=c 权重为1，c<d/a0<1 用半余弦衰减到0。",
+    "unit": "无量纲半径比例",
+    "caveat": "不是轴向 0.3–0.7 区间；仅用于直接加载。应保持 0<=c<1，避免退化的余弦过渡分母。",
+    "source": "03_insert/mod_usr.t:1448; 03_insert/mod_usr.t:1451"
+  },
+  "mag_list.filament_min_height_mm": {
+    "meaning": "直接瞬时密度加载的最低高度；高度小于此值的网格不加载。",
+    "unit": "Mm，相对底面",
+    "caveat": "这是加载掩膜，不改变磁绳形状、不决定大气过渡区高度；仅 load_filament_density=true 时生效。",
+    "source": "03_insert/mod_usr.t:1435"
+  },
+  "mag_list.liakh_mass_loading": {
+    "meaning": "开启沿曲线轴分布的 Liakh 型限时质量源；在时间窗内给密度添加 qdt*S_rho，保持动量和能量变量不变。",
+    "unit": "逻辑值",
+    "caveat": "只在 03_insert 代码中提供。独立于瞬时 load_filament_density；两者同时开会叠加。保持动量时，增加密度会降低对应速度；不加热使单位质量内能下降。续算若时间重置可能重新进入加载窗。",
+    "source": "03_insert/mod_usr.t:160; 03_insert/mod_usr.t:1221; 03_insert/mod_usr.t:1540"
+  },
+  "mag_list.liakh_density_contrast": {
+    "meaning": "Liakh 源幅值 χ：S_rho=χ*rho_bg/t_load*exp[-(d_h/sigma_h)^4-(d_r/sigma_r)^4]，rho_bg 取静力背景表。",
+    "unit": "无量纲，积分增量相对背景密度的系数",
+    "caveat": "χ=30 指完整时间窗核心理想累计增加30*rho_bg，而不是最终密度强制为30倍；若无流动且初始rho=rho_bg，理想中心最终约31倍。实际演化受空间权重、运动和压缩影响。",
+    "source": "03_insert/mod_usr.t:1566; 03_insert/mod_usr.t:1572"
+  },
+  "mag_list.liakh_t_start_s": {
+    "meaning": "Liakh 密度源启动的模拟时间，换为代码时间后与源项的 qtC 比较。",
+    "unit": "s，物理秒",
+    "caveat": "不是作业启动后的墙钟秒；reset_time 或重启保留绝对时间决定是否进入加载窗。有效窗为 [t_start,t_start+t_load)。",
+    "source": "03_insert/mod_usr.t:1550"
+  },
+  "mag_list.liakh_t_load_s": {
+    "meaning": "Liakh 源持续时间，也用于把目标累计密度增量换成每单位时间源率。",
+    "unit": "s，物理秒",
+    "caveat": "必须>0。固定χ而缩短加载时长会提高瞬时源率；并不修改 stoplist 的终止时间。",
+    "source": "03_insert/mod_usr.t:1471; 03_insert/mod_usr.t:1551; 03_insert/mod_usr.t:1575"
+  },
+  "mag_list.liakh_sigma_horizontal_mm": {
+    "meaning": "Liakh 空间源的水平超高斯尺度 sigma_h；水平距离由当前位置与最近轴方向的夹角乘两者平均半径计算。",
+    "unit": "Mm",
+    "caveat": "必须>0；权重使用四次方，不是普通 exp(-d²/2sigma²) 高斯标准差，也不是磁绳 a0。",
+    "source": "03_insert/mod_usr.t:1472; 03_insert/mod_usr.t:1564"
+  },
+  "mag_list.liakh_sigma_radial_mm": {
+    "meaning": "Liakh 空间源的径向超高斯尺度 sigma_r；d_r 为网格半径减去所选最近轴方向处的轴半径。",
+    "unit": "Mm",
+    "caveat": "必须>0；四次方权重 exp[-(d_r/sigma_r)^4]，与磁绳小半径和直接加载核心比例分开控制。",
+    "source": "03_insert/mod_usr.t:1472; 03_insert/mod_usr.t:1565"
+  },
+  "mag_list.liakh_min_height_mm": {
+    "meaning": "Liakh 质量源的最低加载高度；低于它的单元跳过源项。",
+    "unit": "Mm，相对底面",
+    "caveat": "仅控制时间源，独立于 filament_min_height_Mm；不会改变初始大气和磁场。",
+    "source": "03_insert/mod_usr.t:1556"
+  },
+  "mag_list.background_heating_cgs": {
+    "meaning": "径向指数背景加热在底面处的幅值 H0；H(h)=H0*exp[-h/(60 Mm)]，作为体积热源加入能量。",
+    "unit": "erg cm^-3 s^-1",
+    "caveat": "0 表示此背景加热关闭，不表示焦耳/压缩等其他热项全部关闭。加热与辐射开关独立；仅开加热而关辐射会改变热收支。尺度60 Mm在源码中固定，不是此参数本身。",
+    "source": "03_insert/mod_usr.t:198; 03_insert/mod_usr.t:1203; 03_insert/mod_usr.t:2502"
+  },
+  "globalpfss_list.global_boundary_file": {
+    "meaning": "全球球谐 PFSS 的原始全日面径向磁场边界二进制文件；do_rbsl=false 时直接求球谐系数，true 时先以此为输入扣除目标绳光球 Br。",
+    "unit": "相对运行目录或绝对文件路径；Br 为 G",
+    "caveat": "不是局部 bfile：文件包含 nphi、ntheta、theta/phi 坐标数组和全球 Br 数据；必须使用配套预处理格式。仅 01_pfss_global_ct 使用。",
+    "source": "01_pfss_global_ct/mod_usr.t:1432; 01_pfss_global_ct/mod_usr.t:1466"
+  },
+  "globalpfss_list.global_subtracted_boundary_file": {
+    "meaning": "do_rbsl=true 时写出的扣除磁绳 Br 后的全球边界文件，并作为随后球谐 PFSS 计算输入。",
+    "unit": "文件路径",
+    "caveat": "运行会重写此输出并删除其旧 .coef 缓存以重新计算；不要与原始 global_boundary_file 指向同一个文件。do_rbsl=false 时不使用。",
+    "source": "01_pfss_global_ct/mod_usr.t:1434; 01_pfss_global_ct/mod_usr.t:1501; 01_pfss_global_ct/mod_usr.t:1511"
+  },
+  "globalpfss_list.global_patch_x0": {
+    "meaning": "局部 RBSL 光球补丁在全球磁图经度维的起始像素索引，来自预处理 parameters.json。",
+    "unit": "整数，0-based 索引",
+    "caveat": "不是经度角或 Fortran 的1-based索引；写入位置使用 x0+iphi。仅扣除分支使用；需非负且 x0+局部n<=全球nphi。",
+    "source": "01_pfss_global_ct/mod_usr.t:1450; 01_pfss_global_ct/mod_usr.t:1482; 01_pfss_global_ct/mod_usr.t:1492"
+  },
+  "globalpfss_list.global_patch_y0": {
+    "meaning": "局部 RBSL 补丁在全球磁图 theta 存储维的起始像素索引，来自预处理 parameters.json。",
+    "unit": "整数，0-based 索引",
+    "caveat": "不是纬度/余纬角；全球 theta 与局部 RBSL theta 存储顺序相反，代码使用 br_rbsl(m+1-itheta,iphi)。需非负且 y0+局部m<=全球ntheta。",
+    "source": "01_pfss_global_ct/mod_usr.t:1450; 01_pfss_global_ct/mod_usr.t:1482; 01_pfss_global_ct/mod_usr.t:1492"
+  },
+  "globalpfss_list.global_expected_nphi": {
+    "meaning": "扣除分支读取全球磁图时，校验其经度维像素数是否与预期一致。",
+    "unit": "整数，像素数",
+    "caveat": ">0 才执行此维度一致性检查；0 跳过检查。它不重采样磁图、不设 AMR 网格数。",
+    "source": "01_pfss_global_ct/mod_usr.t:1476"
+  },
+  "globalpfss_list.global_expected_ntheta": {
+    "meaning": "扣除分支读取全球磁图时，校验其 theta 维像素数是否与预期一致。",
+    "unit": "整数，像素数",
+    "caveat": ">0 才执行检查；0 跳过检查。不是局部 domain_nx2，也不负责插值改变边界分辨率。",
+    "source": "01_pfss_global_ct/mod_usr.t:1479"
+  },
+  "globalpfss_list.global_pfss_lmax": {
+    "meaning": "全球 PFSS 球谐展开最高阶 l_max，初始化令 trunc=true 并按此阶数截断。",
+    "unit": "非负整数，球谐阶数",
+    "caveat": "提高它可保留更多角向小尺度，也提高计算成本；不是 AMR 最高层级，不改变输入磁图的像素数。",
+    "source": "01_pfss_global_ct/mod_usr.t:1428"
+  },
+  "globalpfss_list.global_pfss_r0": {
+    "meaning": "全球 PFSS 势场模型的内边界半径 R_0，通常为光球半径1。",
+    "unit": "Rsun（本工作流 unit_length=Rsun）",
+    "caveat": "不是径向高度Mm，也不是磁绳半径；应与边界数据和计算域几何一致。仅全球 PFSS 分支使用。",
+    "source": "01_pfss_global_ct/mod_usr.t:1428"
+  },
+  "globalpfss_list.global_pfss_rs": {
+    "meaning": "全球 PFSS 模型源表面半径 R_s，在球谐模型中规定该面磁场径向化。",
+    "unit": "Rsun",
+    "caveat": "不是 MHD 计算域顶 xprobmax1，也不是局部 PDFI 分支的源表面参数；改变它会改变整体背景场拓扑，应重新生成背景。",
+    "source": "01_pfss_global_ct/mod_usr.t:1429; 01_pfss_global_ct/mod_usr.t:1441"
+  }
+}

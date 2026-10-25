@@ -1,0 +1,2 @@
+# Compatibility path; maintain dependencies in one place.
+-r ../requirements-preprocess.txt

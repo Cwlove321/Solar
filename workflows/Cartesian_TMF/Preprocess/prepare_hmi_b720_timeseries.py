@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import re
 import shutil
@@ -14,7 +15,7 @@ import sys
 SEGMENTS = ("field", "inclination", "azimuth", "disambig")
 COMPONENTS = ("Br", "Bt", "Bp")
 NAME_PATTERN = re.compile(
-    r"hmi\.b_720s\.(?P<time>\d{8}_\d{6}_TAI)\.(?P<segment>field|inclination|azimuth|disambig)\.fits$"
+    r"hmi\.b_720s\.(?P<time>\d{8}_\d{6}_TAI)\.(?P<segment>field|inclination|azimuth|disambig)\.fits$", re.IGNORECASE
 )
 
 
@@ -31,7 +32,12 @@ def main() -> None:
     for index, (timestamp, segments) in enumerate(records.items(), start=1):
         prefix = f"hmi.sharp_cea_720s.{args.harpnum}.{timestamp}"
         outputs = {component: args.output_dir / f"{prefix}.{component}.fits" for component in COMPONENTS}
-        if all(path.exists() and path.stat().st_size > 0 for path in outputs.values()):
+        current = False
+        metadata_path = metadata_dir / f"{timestamp}.json"
+        if metadata_path.exists():
+            old = json.loads(metadata_path.read_text())
+            current = old.get("series_processing") == processing_settings(args)
+        if not args.overwrite and current and all(path.exists() and path.stat().st_size > 0 for path in outputs.values()):
             print(f"[{index}/{len(records)}] skip complete {timestamp}", flush=True)
             continue
 
@@ -61,6 +67,10 @@ def main() -> None:
         ]
         print(f"[{index}/{len(records)}] convert {timestamp}", flush=True)
         subprocess.run(command, check=True)
+        parameters_path = work_dir / "parameters.json"
+        parameters = json.loads(parameters_path.read_text())
+        parameters["series_processing"] = processing_settings(args)
+        parameters_path.write_text(json.dumps(parameters, indent=2) + "\n")
         for component, destination in outputs.items():
             source = work_dir / f"{component}.fits"
             if not source.exists() or source.stat().st_size == 0:
@@ -76,7 +86,7 @@ def main() -> None:
 
 def discover_records(input_dir: Path) -> dict[str, dict[str, Path]]:
     records: dict[str, dict[str, Path]] = {}
-    for path in sorted(input_dir.glob("hmi.b_720s.*.fits")):
+    for path in sorted(input_dir.glob("*.fits")):
         if path.name.startswith("._"):
             continue
         match = NAME_PATTERN.fullmatch(path.name)
@@ -90,6 +100,12 @@ def discover_records(input_dir: Path) -> dict[str, dict[str, Path]]:
     return dict(sorted(records.items()))
 
 
+def processing_settings(args):
+    return {"backend": "jsoc-wiener6-oversample3-gaussian1-v1", **{
+        key: getattr(args, key) for key in ("center_lon", "center_lat", "width_degree", "height_degree",
+            "resolution_degree", "sampling_mode", "oversample_resolution_degree", "smooth_sigma_degree", "smooth_truncate")}}
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", required=True, type=Path)
@@ -100,11 +116,16 @@ def parse_args():
     parser.add_argument("--width-degree", required=True, type=float)
     parser.add_argument("--height-degree", required=True, type=float)
     parser.add_argument("--resolution-degree", type=float, default=0.03)
-    parser.add_argument("--sampling-mode", choices=("direct", "sharp"), default="sharp")
-    parser.add_argument("--oversample-resolution-degree", type=float, default=0.01)
-    parser.add_argument("--smooth-sigma-degree", type=float, default=0.01)
+    parser.add_argument("--sampling-mode", choices=("sharp",), default="sharp")
+    parser.add_argument("--oversample-resolution-degree", type=float)
+    parser.add_argument("--smooth-sigma-degree", type=float)
     parser.add_argument("--smooth-truncate", type=float, default=2.0)
-    return parser.parse_args()
+    parser.add_argument("--overwrite", action="store_true")
+    args = parser.parse_args()
+    for name in ("oversample_resolution_degree", "smooth_sigma_degree"):
+        if getattr(args, name) is None:
+            setattr(args, name, args.resolution_degree / 3)
+    return args
 
 
 if __name__ == "__main__":

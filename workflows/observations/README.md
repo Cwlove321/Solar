@@ -299,3 +299,9 @@ python workflows/observations/download_observations.py solar-orbiter \
 - SunPy wavelength searches: https://docs.sunpy.org/en/stable/api/sunpy.net.attrs.Wavelength.html
 - sunpy-soar SOAR plugin: https://docs.sunpy.org/projects/soar/en/stable/api.html
 - sunpy-soar query examples: https://docs.sunpy.org/projects/soar/en/latest/dev_guide/working.html
+
+## 自定义 SHARP 类 CEA 与 AIA 投影
+
+磁场生成与 AIA 共用网格、中心及参考时间的工作流，见
+[README_custom_cea.md](README_custom_cea.md)。支持角秒范围选择、官方 JSOC 数值内核、
+完整分辨率 FITS/NPY、AIA 曝光归一化及差分自转；bin2 改为显式选项。

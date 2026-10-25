@@ -26,7 +26,15 @@ aia = ["aiapy"]
 io = ["pyevtk"]
 solar-orbiter = ["sunpy-soar"]
 cdf = ["cdflib"]
-test = ["pytest"]
+registration = ["scikit-image"]
+matching = ["opencv-python-headless"]
+movie = ["imageio[ffmpeg]"]
+test = [
+  "pytest",
+  "scikit-image",
+  "opencv-python-headless",
+  "imageio[ffmpeg]",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

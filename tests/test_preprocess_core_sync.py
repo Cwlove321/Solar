@@ -7,6 +7,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 NLFFF_CORE = REPO_ROOT / "workflows/Cartesian_NLFFF/Preprocess/nlfff_core"
 TMF_CORE = REPO_ROOT / "workflows/Cartesian_TMF/Preprocess/nlfff_core"
 SPHERICAL_CORE = REPO_ROOT / "workflows/Spherical_RBSL/Preprocess/rbsl_core"
+FULLMHD_ROOT = REPO_ROOT / "workflows/Spherical_RBSL_FullMHD"
+FULLMHD_CORE = FULLMHD_ROOT / "Preprocess/rbsl_core"
 
 
 def source_files(root: Path) -> dict[Path, bytes]:
@@ -36,13 +38,31 @@ def test_standalone_nlfff_cores_are_identical() -> None:
 def test_standalone_spherical_core_matches_solarutils() -> None:
     """The portable spherical bundle must stay synchronized with solarutils."""
 
-    pairs = {
-        REPO_ROOT / "src/solarutils/sim/spherical.py": SPHERICAL_CORE / "spherical.py",
-        REPO_ROOT / "src/solarutils/obs/maps.py": SPHERICAL_CORE / "maps.py",
-    }
+    pairs = [
+        (REPO_ROOT / "src/solarutils/sim/spherical.py", SPHERICAL_CORE / "spherical.py"),
+        (REPO_ROOT / "src/solarutils/obs/maps.py", SPHERICAL_CORE / "maps.py"),
+        (REPO_ROOT / "src/solarutils/sim/spherical.py", FULLMHD_CORE / "spherical.py"),
+        (REPO_ROOT / "src/solarutils/obs/maps.py", FULLMHD_CORE / "maps.py"),
+    ]
     different = [
         f"{source.relative_to(REPO_ROOT)} != {vendored.relative_to(REPO_ROOT)}"
-        for source, vendored in pairs.items()
+        for source, vendored in pairs
         if source.read_bytes() != vendored.read_bytes()
     ]
     assert not different, "Standalone Spherical_RBSL sources have drifted: " + "; ".join(different)
+
+
+def test_rbsl_path_preprocessors_are_identical() -> None:
+    compact = REPO_ROOT / "workflows/Spherical_RBSL/Preprocess/prepare_rbsl_path.py"
+    fullmhd = FULLMHD_ROOT / "Preprocess/prepare_rbsl_path.py"
+    assert compact.read_bytes() == fullmhd.read_bytes()
+
+
+def test_shared_fullmhd_mod_usr_sources_are_identical() -> None:
+    shared = [
+        FULLMHD_ROOT / stage / "mod_usr.t"
+        for stage in ("01_pfss", "02_relax", "04_fullmhd")
+    ]
+    reference = shared[0].read_bytes()
+    different = [path.relative_to(REPO_ROOT) for path in shared[1:] if path.read_bytes() != reference]
+    assert not different, "Shared FullMHD mod_usr.t files have drifted: " + ", ".join(map(str, different))

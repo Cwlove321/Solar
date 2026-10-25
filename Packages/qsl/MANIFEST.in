@@ -1,0 +1,4 @@
+include LICENSE
+recursive-include fortran *.f90
+recursive-include scripts *.sh
+recursive-include src/qsl/bin qfactor.x

@@ -369,6 +369,66 @@ cases/20241008/products/processed/observations/2300_2400/sdo/aia/
 cases/20241008/products/processed/observations/2300_2400/sdo/aia/<wavelength>/prep_psf_derotate_submap_pixel/
 ```
 
+## 9. AIA 时间序列的内容配准补充
+
+`aia_prep` 的 pointing correction、`register` 与 `derotate_to_reference` 是标准的物理/WCS 校正流程，应始终优先执行。少数 Level-1 序列仍可能在相邻帧之间出现图像内容跳变：例如 WCS 已统一、太阳自转也已校正，但亮结构在数组中仍突然相差数个像素。这种情况可在上述流程**之后**增加内容配准补充。
+
+该步骤以相邻帧的相位相关测量残余 `(dy, dx)`，累积后统一锚定到指定参考帧，并以亚像素插值平移图像。它用于稳定电影、差分图和以同一窗口展示的时间序列；不能替代 WCS pointing correction，也不应把它当作绝对坐标或精密测量的唯一校正。
+
+先安装可选依赖：
+
+```bash
+PYTHONPATH=src /opt/anaconda3/bin/python -m pip install -e '.[registration]'
+```
+
+示例：先完成 AIA 标准预处理与逐像素 derotation，再对结果做内容配准。这里固定第 600 帧，使该帧的位移严格为零。
+
+```python
+from solarutils.obs import align_map_sequence_by_content, derotate_to_reference
+
+derotated = [
+    derotate_to_reference(
+        path,
+        reference_submap,
+        aia_prep=True,
+        pointing_table=pointing_table,
+        method="pixel",
+    )
+    for path in files
+]
+
+stable_maps, applied_shifts = align_map_sequence_by_content(
+    derotated,
+    reference_index=600,
+    upsample_factor=20,
+)
+print(applied_shifts[599:601])  # 每帧写入时实际施加的 (dy, dx)，单位为像素
+```
+
+若耀斑核心、喷发或饱和亮区快速演化，整幅图的相位相关可能被该区域主导，从而仍造成局部背景抖动。此时用稳定背景区域测量位移，再把位移应用到整幅图。例如窗口为 `x=[-120,-40]`、`y=[-500,-410]` arcsec 时，左侧背景可使用：
+
+```python
+stable_maps, applied_shifts = align_map_sequence_by_content(
+    derotated,
+    reference_index=600,
+    region=(slice(10, 141), slice(0, 55)),  # (y, x)，仅用于测量位移
+    upsample_factor=20,
+)
+```
+
+该区域应根据具体数据选择，要求包含稳定且有纹理的日冕结构，并避开快速演化的亮区；它不改变输出的 WCS 标注，只对像素数据做统一平移。
+
+检查异常跳变：
+
+```python
+import numpy as np
+
+largest = np.max(np.linalg.norm(applied_shifts[1:] - applied_shifts[:-1], axis=1))
+print(f"largest frame-to-frame residual correction: {largest:.2f} pixel")
+```
+
+对于 2022-08-15 AIA 171 Å 的 `590--750` 帧序列，原始标准流程后第 `599 -> 600` 帧仍有约 4 像素残余跳变；补充内容配准后，该对帧残余约为 0.12 像素，整个序列最大相邻残余为约 0.21 像素。
+
 验证结果：
 
 ```text

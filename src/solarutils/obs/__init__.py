@@ -35,6 +35,7 @@ from solarutils.obs.download import (
 from solarutils.obs.maps import (
     AIA_EUV_WAVELENGTHS,
     DEFAULT_AIA_PSF_DIR,
+    align_map_sequence_by_content,
     aia_prep,
     aia_psf_path,
     cache_aia_psfs,
@@ -62,6 +63,7 @@ __all__ = [
     "SOLAR_RADIUS_KM",
     "aia_prep",
     "aia_psf_path",
+    "align_map_sequence_by_content",
     "cache_aia_psfs",
     "calculate_dave4vm",
     "carrington_rotation_for_time",

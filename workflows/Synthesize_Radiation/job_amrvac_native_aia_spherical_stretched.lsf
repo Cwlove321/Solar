@@ -1,0 +1,26 @@
+#!/bin/bash
+#BSUB -q mpi
+#BSUB -J amrvac_native_aia
+#BSUB -n 64
+#BSUB -R "span[ptile=64]"
+#BSUB -W 02:00
+#BSUB -M 64000
+
+set -euo pipefail
+
+# Set these four paths for the target simulation and snapshot.
+BASE_PAR=${BASE_PAR:?Set BASE_PAR to the simulation amrvac.par}
+INPUT_DAT=${INPUT_DAT:?Set INPUT_DAT to one AMRVAC .dat snapshot}
+AMRVAC_EXE=${AMRVAC_EXE:?Set AMRVAC_EXE to the matching executable}
+OUTPUT_DIR=${OUTPUT_DIR:?Set OUTPUT_DIR to a new output directory}
+
+WORKFLOW_DIR=${WORKFLOW_DIR:-/share/home/guoyang1/zhouchang/solar_code/workflows/Synthesize_Radiation}
+mkdir -p "$OUTPUT_DIR/logs"
+exec >"$OUTPUT_DIR/logs/lsf_${LSB_JOBID}.out"
+exec 2>"$OUTPUT_DIR/logs/lsf_${LSB_JOBID}.err"
+
+MPI_RANKS=64 \
+PYTHON=/share/home/guoyang1/apps/miniconda3/envs/zcc/bin/python \
+INSTRUMENT_RESOLUTION_FACTOR=${INSTRUMENT_RESOLUTION_FACTOR:-0.25} \
+"$WORKFLOW_DIR/synthesize_aia_amrvac_native_spherical_stretched.sh" \
+  "$BASE_PAR" "$INPUT_DAT" "$AMRVAC_EXE" "$OUTPUT_DIR" "${WAVELENGTH:-193}"

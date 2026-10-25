@@ -14,10 +14,12 @@ import plotly.graph_objects as go
 from astropy.coordinates import SkyCoord
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.patches import Circle, Polygon
+from matplotlib.lines import Line2D
 from scipy.interpolate import splev, splprep
 from scipy.ndimage import map_coordinates
 from sunpy.coordinates import frames
 from sunpy.map import Map
+from sunpy.physics.differential_rotation import solar_rotate_coordinate
 
 try:
     from .rbsl_core.maps import get_submap
@@ -53,6 +55,16 @@ def main(argv: list[str] | None = None) -> int:
 
     pick_map = resolve_pick_map(args)
     submap = pick_map
+    hmi_contours = None
+    hmi_contour_alignment = None
+    if args.hmi_contour_levels is not None:
+        if args.aia is None or args.hmi is None:
+            raise ValueError("--hmi-contour-levels requires both --aia and --hmi")
+        contour_map, hmi_contour_alignment = align_hmi_contours_to_aia(Map(args.hmi), pick_map)
+        aligned_path = output_dir / "hmi_on_aia_grid.fits"
+        contour_map.save(aligned_path, overwrite=True)
+        hmi_contour_alignment["aligned_fits"] = str(aligned_path)
+        hmi_contours = (contour_map, args.hmi_contour_levels)
     reference_path_coords = None
     if args.reference_points:
         reference_points = np.load(args.reference_points)
@@ -70,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
             smooth_points=args.smooth_path_points,
             smoothing=args.smooth_path_smoothing,
             reference_path_coords=reference_path_coords,
+            hmi_contours=hmi_contours,
         )
 
     points = np.asarray(points, dtype=float)
@@ -90,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
             image_output_dir / "picked_points.png",
             circle_radius_arcsec=args.footpoint_circle_arcsec,
             reference_path_coords=reference_path_coords,
+            hmi_contours=hmi_contours,
         )
 
     lon_range = tuple(args.lon_range) if args.lon_range is not None else None
@@ -192,6 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         image_vmax=args.hmi_vmax if is_hmi_map(submap) else None,
         footpoint_value_labels=footpoint_value_labels,
         show_length_label=not args.hide_length_label,
+        hmi_contours=hmi_contours,
     )
     rope_3d_html = None
     rope_3d_hmi_html = None
@@ -243,6 +258,12 @@ def main(argv: list[str] | None = None) -> int:
         "rope_twist": args.rope_twist,
         "hmi_background_used": hmi_map is not None,
         "hmi_map_type": hmi_map_type,
+        "aia_fits": args.aia,
+        "hmi_fits": args.hmi,
+        "submap_arcsec": list(args.submap_arcsec),
+        "reference_points": args.reference_points,
+        "hmi_contour_levels_G": args.hmi_contour_levels,
+        "hmi_contour_alignment": hmi_contour_alignment,
         "rope_3d_html": str(rope_3d_html) if rope_3d_html is not None else None,
         "rope_3d_hmi_html": str(rope_3d_hmi_html) if rope_3d_hmi_html is not None else None,
         "path_dat": str(path),
@@ -346,6 +367,10 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument("--image-vmax", type=float, help="Legacy upper display limit after image-power.")
     parser.add_argument("--hmi-vmin", type=float, default=-300.0)
     parser.add_argument("--hmi-vmax", type=float, default=300.0)
+    parser.add_argument(
+        "--hmi-contour-levels", nargs="+", type=float,
+        help="Overlay HMI contours in gauss on AIA picking and output images, e.g. -30 30. Requires --aia and --hmi.",
+    )
     parser.add_argument(
         "--footpoint-flux-radius-mm",
         type=float,
@@ -468,6 +493,79 @@ def format_projection_title(smap):
             prefix = "HMI"
         return f"{prefix} {smap.date.isot[:19].replace('T', ' ')}"
     return None
+
+
+def plot_hmi_contours(ax, hmi_contours):
+    """Draw signed HMI contours in the target axes' WCS, retaining its limits."""
+    if hmi_contours is None:
+        return
+    smap, levels = hmi_contours
+    levels = sorted(set(float(level) for level in levels))
+    colors = ["dodgerblue" if level < 0 else "red" for level in levels]
+    styles = ["--" if level < 0 else "-" for level in levels]
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    smap.draw_contours(
+        np.asarray(levels) * u.G, axes=ax, colors=colors,
+        linestyles=styles, linewidths=0.7, alpha=0.85, zorder=2,
+    )
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.legend(
+        handles=[Line2D([], [], color=color, linestyle=style, linewidth=1.2,
+                        label=f"HMI {level:+g} G")
+                 for level, color, style in zip(levels, colors, styles)],
+        loc="upper left", fontsize=8, framealpha=0.7,
+    )
+
+
+def align_hmi_contours_to_aia(source, target):
+    """Inverse sample native HMI once onto the AIA grid at its reference time.
+
+    Solar-surface propagation aligns positions, not the evolution of the LOS
+    field. No additional rotation/resampling, magnetic smoothing or LOS-to-Br
+    conversion is applied.
+    """
+    yy, xx = np.indices(target.data.shape, dtype=float)
+    target_coords = target.pixel_to_world(xx * u.pix, yy * u.pix)
+    source_coords = solar_rotate_coordinate(
+        target_coords, observer=source.observer_coordinate, model="howard",
+    )
+    px, py = source.world_to_pixel(source_coords)
+    data = map_coordinates(
+        np.asarray(source.data, dtype=float), [py.to_value(u.pix), px.to_value(u.pix)],
+        order=1, mode="constant", cval=np.nan,
+    ) * source.unit.to(u.G)
+    source_time = source.coordinate_frame.obstime
+    target_time = target.coordinate_frame.obstime
+    metadata = target.wcs.to_header()
+    metadata["INSTRUME"] = "HMI"
+    metadata["TELESCOP"] = "SDO/HMI"
+    metadata["BUNIT"] = "G"
+    metadata["DATE-OBS"] = target.date.utc.isot
+    metadata["DATE-AVG"] = target_time.utc.isot
+    metadata["T_OBS"] = target_time.utc.isot
+    metadata["SRC_TIME"] = source_time.utc.isot
+    metadata["SRC_DATE"] = source.date.utc.isot
+    metadata["ROTMODEL"] = "howard"
+    metadata["CONTENT"] = "HMI field sampled on AIA grid; original field component retained"
+    if bool(source.meta.get("SOLBRMAP")):
+        metadata["SOLBRMAP"] = True
+    aligned = Map(data, metadata)
+    info = {
+        "source_hmi_date_obs_utc": source.date.utc.isot,
+        "source_hmi_reference_time_utc": source_time.utc.isot,
+        "target_aia_date_obs_utc": target.date.utc.isot,
+        "target_aia_reference_time_utc": target_time.utc.isot,
+        "target_minus_source_seconds": float((target_time - source_time).to_value(u.s)),
+        "method": "Native HMI inverse sampled once onto AIA WCS with Howard solar-surface propagation",
+        "spatial_interpolation": "bilinear (order=1)",
+        "magnetic_smoothing": False,
+        "temporal_field_interpolation": False,
+        "source_field_component": classify_hmi_map(source),
+        "shape": list(data.shape),
+        "finite_fraction": float(np.isfinite(data).mean()),
+    }
+    return aligned, info
 
 
 def format_colorbar_label(smap):
@@ -732,11 +830,14 @@ def pick_path_points_on_submap(
     smooth_points,
     smoothing,
     reference_path_coords=None,
+    hmi_contours=None,
 ):
     fig = plt.figure(figsize=(8, 8), dpi=160)
     ax = fig.add_subplot(projection=smap)
     plot_submap_image(smap, ax)
+    plot_hmi_contours(ax, hmi_contours)
     set_solar_xy_labels(ax)
+    fig.canvas.manager.set_window_title(f"RBSL path picker - {output.parent.name}")
     if reference_path_coords is not None:
         ax.plot_coord(
             SkyCoord(reference_path_coords),
@@ -793,6 +894,7 @@ def pick_path_points_on_submap(
         output,
         circle_radius_arcsec=circle_radius_arcsec,
         reference_path_coords=reference_path_coords,
+        hmi_contours=hmi_contours,
     )
     plt.close(fig)
     return points, coords_hpc
@@ -849,10 +951,12 @@ def plot_path_on_submap(
     title_override=None,
     colorbar_label=None,
     show_colorbar=False,
+    hmi_contours=None,
 ):
     fig = plt.figure(figsize=(8, 8), dpi=160)
     ax = fig.add_subplot(projection=smap)
     image_artist = plot_submap_image(smap, ax, vmin=image_vmin, vmax=image_vmax)
+    plot_hmi_contours(ax, hmi_contours)
     ax.grid(alpha=0)
     set_solar_xy_labels(ax)
     if title_override is not None:
@@ -992,6 +1096,7 @@ def plot_projected_path_on_aia(
     image_vmax=None,
     footpoint_value_labels=None,
     show_length_label=True,
+    hmi_contours=None,
 ):
     coords = lonlatr_to_hpc(path_lonlatr, smap)
     boundary_coords = lonlatr_to_hpc(boundary_lonlatr, smap) if (boundary_lonlatr is not None and show_boundary_line) else None
@@ -1026,6 +1131,7 @@ def plot_projected_path_on_aia(
         title_override=format_projection_title(smap),
         colorbar_label=format_colorbar_label(smap),
         show_colorbar=is_hmi_map(smap),
+        hmi_contours=hmi_contours,
     )
 
 

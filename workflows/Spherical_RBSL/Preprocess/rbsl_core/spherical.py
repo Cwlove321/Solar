@@ -1281,17 +1281,19 @@ def pfss_amrvac_parameters(
     length_r: float,
     refine_level: int = 1,
     inner_radius: float = 1.001,
+    domain_nr: int | None = None,
 ):
     """Return domain settings for `pfss_amrvac.par`.
 
-    ``inner_radius=1.001`` matches the bundled PFSS/RBSL templates and keeps the
-    numerical inner boundary just above the photosphere.
+    ``domain_nr`` overrides the radial base-grid size.  When omitted, the
+    historical square radial/latitudinal base grid is retained.  The default
+    inner radius remains 1.001 for backward compatibility with existing cases.
     """
 
     pfss_ny, pfss_nx = global_shape
     divisor = 2 ** (int(refine_level) - 1)
     return {
-        "domain_nx1": ny / divisor,
+        "domain_nx1": ny / divisor if domain_nr is None else int(domain_nr),
         "domain_nx2": ny / divisor,
         "domain_nx3": nx / divisor,
         "xprobmin1": float(inner_radius),

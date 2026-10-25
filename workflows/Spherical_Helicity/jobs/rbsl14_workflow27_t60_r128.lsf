@@ -1,0 +1,49 @@
+#!/bin/bash
+#BSUB -q serial
+#BSUB -n 8
+#BSUB -R "span[hosts=1]"
+#BSUB -W 00:30
+#BSUB -J "r14hel_t60[1-26]%4"
+#BSUB -o /share/home/guoyang1/zhouchang/20241009/rbsl14/helicity_workflow27_t60_r128/log/lsf.%J.%I.out
+#BSUB -e /share/home/guoyang1/zhouchang/20241009/rbsl14/helicity_workflow27_t60_r128/log/lsf.%J.%I.err
+
+set -euo pipefail
+
+case_dir=/share/home/guoyang1/zhouchang/20241009/rbsl14/workflow27_03_fullmhd_from_nr7t0p3_rbsl2p7e20_liakh50_tload10s_t60min_dt1min_datvtu
+code_dir=/share/home/guoyang1/zhouchang/solar_code
+result_root=/share/home/guoyang1/zhouchang/20241009/rbsl14/helicity_workflow27_t60_r128
+python_bin=/share/home/guoyang1/apps/miniconda3/envs/zcc/bin/python
+
+index=${LSB_JOBINDEX:?LSB_JOBINDEX is required}
+frame=$(printf '%04d' "$((index - 1))")
+dat_path="${case_dir}/data/r14_w27m_${frame}.dat"
+frame_dir="${result_root}/frame_${frame}"
+
+test -s "${dat_path}"
+mkdir -p "${frame_dir}"
+
+if test -s "${frame_dir}/spherical_helicity.json"; then
+  echo "frame ${frame}: existing result retained"
+  exit 0
+fi
+
+export OMP_NUM_THREADS=${LSB_DJOB_NUMPROC:-8}
+export OPENBLAS_NUM_THREADS=${LSB_DJOB_NUMPROC:-8}
+export MKL_NUM_THREADS=${LSB_DJOB_NUMPROC:-8}
+export NUMEXPR_NUM_THREADS=${LSB_DJOB_NUMPROC:-8}
+
+cd "${code_dir}"
+TIMEFORMAT='real_seconds %R'
+{
+  time "${python_bin}" workflows/Spherical_Helicity/spherical_helicity.py \
+    "${dat_path}" \
+    --grid-config "${case_dir}/amrvac.par" \
+    --resolution 128,64,128 \
+    --references bottom,top \
+    --unit-length-cm 6.955e10 \
+    --unit-b-gauss 1.99757357615242 \
+    --no-save-fields \
+    --output "${frame_dir}"
+} 2>&1 | tee "${frame_dir}/run.log"
+
+test -s "${frame_dir}/spherical_helicity.json"

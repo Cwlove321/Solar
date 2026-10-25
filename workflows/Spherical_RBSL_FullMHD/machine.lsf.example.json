@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "amrvac_dir": "vendor/amrvac",
+  "arch": "default",
+  "make_jobs": 4,
+  "module_setup": [],
+  "environment": {},
+  "library_dirs": ["/path/to/compiled-dependencies/lib"],
+  "libraries": ["pdfi_ss", "fishpack", "cfitsio"],
+  "stage_libraries": {},
+  "compiler_commands": ["mpif90"],
+  "launcher": ["mpirun", "-np", "{ranks}"],
+  "ranks": {"01_pfss": 8, "01_pfss_global_ct": 8, "02_relax": 8, "03_insert": 8, "04_fullmhd": 8},
+  "scheduler": {"kind": "lsf", "queue": "mpi", "ptile": 4, "submit_command": "bsub", "cancel_command": "bkill"},
+  "executable": "./amrvac",
+  "make_command": "make",
+  "setup_command": null
+}

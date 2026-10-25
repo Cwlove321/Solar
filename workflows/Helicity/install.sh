@@ -8,9 +8,9 @@ venv_dir=${VENV_DIR:-"${script_dir}/.venv"}
 simesh_dir=${SIMESH_DIR:-"${repository_root}/Packages/simesh"}
 
 if [[ ! -d "${simesh_dir}" ]]; then
-    echo "未找到 simesh，从原作者仓库拉取到：${simesh_dir}"
-    mkdir -p "$(dirname "${simesh_dir}")"
-    git clone https://github.com/Astery0502/simesh.git "${simesh_dir}"
+    echo "错误：缺少仓库内锁定的 simesh：${simesh_dir}" >&2
+    echo "请恢复完整 solar_code checkout，不要自动安装未锁定的上游最新版。" >&2
+    exit 1
 fi
 
 echo "[1/3] 创建 Python 环境：${venv_dir}"

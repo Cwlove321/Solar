@@ -1,0 +1,64 @@
+{
+  "pfss_stage": "01_pfss",
+  "fullmhd_source": "insert",
+  "thermal_profile": "default",
+  "amr_mode": "fixed",
+  "atmosphere": {
+    "model": "analytic_tr",
+    "normalization": "number_density",
+    "reference_height_mm": 10.0,
+    "reference_nh_cm3": 6.2e8
+  },
+  "grid": {
+    "domain_nx1": 72,
+    "xprobmin1": 1.0,
+    "xprobmax1": 1.5,
+    "qstretch_baselevel1": 1.041541581503301,
+    "refine_max_level": 4
+  },
+  "rbsl": {
+    "bflux_mx": 1.29e20,
+    "radius_mm": 15.0,
+    "positive_helicity": false,
+    "flip_axis": false
+  },
+  "global_pfss": {
+    "lmax": 360,
+    "r0": 1.0,
+    "rs": 2.5
+  },
+  "filament": {
+    "method": "liakh_source",
+    "density_factor": 20.0,
+    "core_fraction": 0.6,
+    "minimum_height_mm": 5.0,
+    "liakh_mass_loading": {
+      "density_contrast": 30.0,
+      "start_time_s": 0.0,
+      "load_time_s": 100.0,
+      "sigma_horizontal_mm": 3.6,
+      "sigma_radial_mm": 4.8,
+      "minimum_height_mm": 5.0
+    }
+  },
+  "stage_times": {
+    "02_relax": {
+      "time_max_code": 1.0,
+      "save_interval_code": 0.05,
+      "reset_time": true,
+      "autoconvert": false
+    },
+    "03_insert": {
+      "time_max_code": 0.018417818440236957,
+      "save_interval_code": 0.0016743471309306326,
+      "reset_time": true,
+      "autoconvert": false
+    },
+    "04_fullmhd": {
+      "time_max_code": 0.3,
+      "save_interval_code": 0.005,
+      "reset_time": true,
+      "autoconvert": true
+    }
+  }
+}
